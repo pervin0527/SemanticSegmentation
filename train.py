@@ -5,16 +5,19 @@ import torch
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 
+from torchinfo import summary
+# from torchsummary import summary
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from transformers import SegformerForSemanticSegmentation, SegformerFeatureExtractor, SegformerImageProcessor
+from torch.utils.tensorboard import SummaryWriter
+from transformers import SegformerForSemanticSegmentation, SegformerConfig, SegformerImageProcessor
 
 from loss import FocalLoss
 from dataset import VOCDataset
 from utils import Args, save_inference_mask
 
 
-def valid(model, dataloader, criterion, epoch, args):
+def valid(model, dataloader, criterion, args):
     model.eval()
     accs = []
     losses = []
@@ -41,7 +44,7 @@ def valid(model, dataloader, criterion, epoch, args):
     return sum(accs)/len(accs), sum(losses)/len(losses)
 
 
-def train(model, dataloader, optimizer, criterion, args, epoch):
+def train(model, dataloader, optimizer, criterion, args):
     model.train()
     accs = []
     losses = []
@@ -71,17 +74,27 @@ def train(model, dataloader, optimizer, criterion, args, epoch):
     
 
 def main(args):
-    # feature_extractor = SegformerFeatureExtractor(align=False, reduce_zero_label=False)
-    feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=False)
-    model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name, 
-                                                             ignore_mismatched_sizes=True,
-                                                             num_labels=len(args.VOC_CLASSES), 
-                                                             id2label=args.id2label, 
-                                                             label2id=args.label2id,
-                                                             reshape_last_stage=True)
+    writer = SummaryWriter(log_dir=f"{args.save_dir}/logs") 
+    config = SegformerConfig.from_pretrained(args.pretrained_model_name,
+                                             image_size=args.img_size, 
+                                             num_labels=len(args.VOC_CLASSES), 
+                                             id2label=args.id2label, 
+                                             label2id=args.label2id,)
+    config.save_pretrained(args.save_dir)
+
+    model = SegformerForSemanticSegmentation(config)
+    # model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name, ignore_mismatched_sizes=True, num_labels=len(args.VOC_CLASSES),  id2label=args.id2label,  label2id=args.label2id, reshape_last_stage=True)
+    summary(model, input_size=(1, 3, args.img_size, args.img_size), device="cpu")
     model.to(args.device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = FocalLoss(num_classes=len(args.VOC_CLASSES)).to(args.device)
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=args.lr_patience, verbose=True)
+
+    # feature_extractor = SegformerFeatureExtractor(align=False, reduce_zero_label=False)
+    feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=False)
+
 
     train_dataset = VOCDataset(args, feature_extractor, image_set="train")
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -92,19 +105,29 @@ def main(args):
     best_valid_loss = float('inf')
     for epoch in range(args.epochs):
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"\nEpoch : [{epoch+1}|{args.epochs}], LR : {current_lr}")
-        train_acc, train_loss = train(model, train_dataloader, optimizer, criterion, args, epoch)
+        print(f"\nEpoch : [{epoch+1:>03}|{args.epochs}], LR : {current_lr}")
+        writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], epoch)
+
+        train_acc, train_loss = train(model, train_dataloader, optimizer, criterion, args)
+        writer.add_scalar('Training/Loss', train_loss, epoch)
+        writer.add_scalar('Training/Accuracy', train_acc, epoch)
         print(f"Train Acc : {train_acc:.4f}, Train Loss : {train_loss:.4f}")
 
-        valid_acc, valid_loss = valid(model, valid_dataloader, criterion, epoch, args)
+        valid_acc, valid_loss = valid(model, valid_dataloader, criterion, args)
+        writer.add_scalar('Validation/Loss', valid_loss, epoch)
+        writer.add_scalar('Validation/Accuracy', valid_acc, epoch)
         print(f"Valid Acc : {valid_acc:.4f}, Valid Loss : {valid_loss:.4f}")
 
-        save_inference_mask("./dog.jpg", model, feature_extractor, args, epoch)
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
             print(f"Valid Loss improved, model saved.")
 
+        save_inference_mask("./dog.jpg", model, feature_extractor, args, epoch)
+        # scheduler.step()
+        scheduler.step(valid_loss)
+
+    writer.close()
 
 if __name__ == "__main__":
     args = Args("./config.yaml", is_train=True)

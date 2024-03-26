@@ -12,6 +12,10 @@ def get_transform(is_train, img_size):
         transform = A.Compose([
             A.Resize(height=img_size, width=img_size),
             A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.7),
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.8),
+            A.RandomBrightnessContrast(p=0.5),
             # A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             # ToTensorV2(),
         ])
@@ -27,7 +31,7 @@ def get_transform(is_train, img_size):
 
 
 class VOCDataset(Dataset):
-    def __init__(self, args, feature_extractor, image_set="train"):
+    def __init__(self, args, feature_extractor=None, image_set="train"):
         self.args = args
         self.data_dir = args.data_dir
         self.image_dir = f"{self.data_dir}/JPEGImages"
@@ -53,12 +57,9 @@ class VOCDataset(Dataset):
 
     def _convert_to_segmentation_mask(self, mask):
         height, width = mask.shape[:2]
-        # 클래스 인덱스를 저장할 그레이스케일 이미지 초기화
         segmentation_mask = np.zeros((height, width), dtype=np.uint8)
 
-        # VOC_COLORMAP에서 각 색상에 대해
         for label_index, label_color in enumerate(self.args.VOC_COLORMAP):
-            # 색상 매칭을 사용하여 해당 색상을 가진 픽셀을 찾고 클래스 인덱스로 설정
             match = np.all(mask == np.array(label_color), axis=-1)
             segmentation_mask[match] = label_index
 
@@ -76,9 +77,13 @@ class VOCDataset(Dataset):
         mask = self._convert_to_segmentation_mask(mask)
 
         transformed = self.transform(image=image, mask=mask)
-        encoded_inputs = self.feature_extractor(transformed['image'], transformed['mask'], return_tensors="pt")
 
-        for k, v in encoded_inputs.items():
-            encoded_inputs[k].squeeze_()
+        if self.feature_extractor is not None:
+            encoded_inputs = self.feature_extractor(transformed['image'], transformed['mask'], return_tensors="pt")
+            for k, v in encoded_inputs.items():
+                encoded_inputs[k].squeeze_()
 
-        return encoded_inputs
+            return encoded_inputs   
+        
+        else:
+            return transformed["image"], transformed["mask"]
