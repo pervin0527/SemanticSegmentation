@@ -29,7 +29,6 @@ def get_transform(is_train, img_size):
 
     return transform
 
-
 class VOCDataset(Dataset):
     def __init__(self, args, feature_extractor=None, image_set="train"):
         self.args = args

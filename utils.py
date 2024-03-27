@@ -2,9 +2,11 @@ import os
 import cv2
 import yaml
 import torch
+import evaluate
 import numpy as np
 import matplotlib.pyplot as plt
 
+from tqdm import tqdm
 from datetime import datetime
 from torch.nn import functional as F
 
@@ -89,3 +91,24 @@ def save_inference_mask(image_path, model, feature_extractor, args, epoch):
     plt.tight_layout()
     plt.savefig(f"{args.save_dir}/images/EP{epoch:>04}.jpg")
     plt.close()
+
+
+def compute_mean_iou(model, dataloader, device, num_labels, ignore_index):
+    model.eval()
+    metric = evaluate.load("mean_iou")
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Computing Mean IoU", leave=False):
+            pixel_values = batch["pixel_values"].to(device)
+            labels = batch["labels"].to(device)
+            outputs = model(pixel_values=pixel_values)
+            logits = outputs.logits
+            upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
+            predicted = upsampled_logits.argmax(dim=1).detach().cpu().numpy()
+            labels = labels.detach().cpu().numpy()
+            
+            # Update metric for each batch
+            metric.add_batch(predictions=predicted, references=labels)
+
+    # Compute the mean IoU over all batches
+    mean_iou = metric.compute(num_labels=num_labels, ignore_index=ignore_index)
+    return mean_iou["mean_iou"]
