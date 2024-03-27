@@ -75,7 +75,7 @@ def save_inference_mask(image_path, model, feature_extractor, args, epoch):
 
     mixed_img = (0.5 * image + 0.5 * color_seg).astype(np.uint8)
 
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axs = plt.subplots(1, 3, figsize=(18, 8))
     axs[0].imshow(image)
     axs[0].set_title("Original Image")
     axs[0].axis('off')
@@ -93,7 +93,7 @@ def save_inference_mask(image_path, model, feature_extractor, args, epoch):
     plt.close()
 
 
-def compute_mean_iou(model, dataloader, device, num_labels, ignore_index):
+def compute_mean_iou(model, dataloader, device, num_labels, ignore_index=255):
     model.eval()
     metric = evaluate.load("mean_iou")
     with torch.no_grad():
@@ -110,5 +110,34 @@ def compute_mean_iou(model, dataloader, device, num_labels, ignore_index):
             metric.add_batch(predictions=predicted, references=labels)
 
     # Compute the mean IoU over all batches
-    mean_iou = metric.compute(num_labels=num_labels, ignore_index=ignore_index)
-    return mean_iou["mean_iou"]
+    metrics = metric.compute(num_labels=num_labels, ignore_index=ignore_index)
+    per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
+    per_category_iou = metrics.pop("per_category_iou").tolist()
+
+    detailed_metrics = {
+        "mean_iou": metrics["mean_iou"],
+        **{f"accuracy_class_{i}": acc for i, acc in enumerate(per_category_accuracy)},
+        **{f"iou_class_{i}": iou for i, iou in enumerate(per_category_iou)}
+    }
+
+    return detailed_metrics
+
+def plot_metrics(detailed_metrics, class_names, metric_name, save_path):
+    """
+    detailed_metrics: compute_mean_iou에서 반환된 메트릭 딕셔너리
+    class_names: 클래스 이름 리스트
+    metric_name: 'accuracy' 또는 'iou' 중 하나
+    save_path: 차트를 저장할 경로 (확장자 포함)
+    """
+    metric_values = [detailed_metrics[f"{metric_name}_class_{i}"] for i in range(len(class_names))]
+    
+    plt.figure(figsize=(10, 6))
+    y_pos = np.arange(len(class_names))
+    plt.bar(y_pos, metric_values, align='center', alpha=0.7)
+    plt.xticks(y_pos, class_names, rotation=45, ha="right")
+    plt.ylabel(metric_name)
+    plt.title(f'Class-wise {metric_name.upper()}')
+    
+    plt.tight_layout()  # 레이블이 잘리지 않도록 조정
+    plt.savefig(save_path)
+    plt.close()

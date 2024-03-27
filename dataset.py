@@ -30,14 +30,14 @@ def get_transform(is_train, img_size):
     return transform
 
 class VOCDataset(Dataset):
-    def __init__(self, args, feature_extractor=None, image_set="train"):
+    def __init__(self, args, feature_extractor=None, image_set="train", year=2012):
         self.args = args
-        self.data_dir = args.data_dir
+        self.data_dir = f"{args.data_dir}/VOC{year}"
         self.image_dir = f"{self.data_dir}/JPEGImages"
         self.mask_dir = f"{self.data_dir}/SegmentationClass"
 
         self.feature_extractor = feature_extractor
-        self.transform = get_transform(True if image_set == "train" else False, img_size=args.img_size)
+        self.transform = get_transform(True if image_set == "train" or image_set == "trainval" else False, img_size=args.img_size)
 
         with open(f"{self.data_dir}/ImageSets/Segmentation/{image_set}.txt", "r") as file:
             self.file_names = file.read().splitlines()
