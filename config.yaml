@@ -1,13 +1,13 @@
-data_dir: "/home/pervinco/Datasets/PASCAL_VOC/VOCDevkit"
+data_dir: "/home/pervinco/Datasets/PASCAL_VOC/VOCDevkit" # "/home/pervinco/Datasets/COCO2017"
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" # "nvidia/segformer-b0-finetuned-ade-512-512"
-sample_img: "./dog.jpg"
+sample_img: "./sample/dog.jpg"
 
 epochs: 1000
 img_size: 512
 batch_size: 4
 learning_rate: 0.0001
-mIoU_step: 1
+mIoU_step: 10
 
 lr_patience: 40
 min_lr: 0.00001
@@ -33,7 +33,7 @@ layer_norm_eps: 0.000001
 decoder_hidden_size: 256
 semantic_loss_ignore_index: 255
 
-VOC_CLASSES:
+CLASSES:
   [
     "background",
     "aeroplane",
@@ -58,7 +58,7 @@ VOC_CLASSES:
     "tv/monitor",
   ]
 
-VOC_COLORMAP:
+COLORMAP:
   [
     [0, 0, 0],
     [128, 0, 0],
