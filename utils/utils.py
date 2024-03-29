@@ -70,7 +70,7 @@ def save_inference_mask(image_path, model, feature_extractor, args, epoch):
 
     seg = upsampled_logits.argmax(dim=1)[0]
     color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
-    for label, color in enumerate(args.COLORMAP):
+    for label, color in enumerate(args.colormap):
         color_seg[seg == label, :] = np.array(color)
 
     mixed_img = (0.5 * image + 0.5 * color_seg).astype(np.uint8)

@@ -41,25 +41,30 @@ def mask_decoding(pred_mask):
 
 
 class BKAIDataset(Dataset):
-    def __init__(self, args, feature_extractor=None):
+    CLASSES = ["background", "non-neoplastic polyps", "neoplastic polyps"]
+    COLORMAP = [[0, 0, 0], [0, 255, 0], [255, 0, 0]]
+
+    def __init__(self, args, feature_extractor=None, image_set="train"):
         self.args = args
-        self.data_dir = args.data_dir
-        self.image_dir = f"{self.data_dir}/train"
-        self.mask_dir = f"{self.data_dir}/train_gt"
-        self.transform = get_transform(is_train=True, img_size=self.img_size)
-
-        image_files = sorted(glob(f"{self.image_dir}/*.jpeg"))
-        mask_files = sorted(glob(f"{self.mask_dir}/*.jpeg"))
-        self.total_files = list(zip(image_files, mask_files))
-
         self.feature_extractor = feature_extractor
-        self.transform = get_transform(is_train=True, img_size=self.img_size)
+        
+        self.data_dir = args.data_dir
+        self.image_dir = f"{self.data_dir}/train/train"
+        self.mask_dir = f"{self.data_dir}/train_gt/train_gt"
+        self.transform = get_transform(True if image_set == "train" or image_set == "trainval" else False, img_size=args.img_size)
+
+        with open(f"{self.data_dir}/{image_set}.txt", 'r') as f:
+            self.total_files = [line.strip() for line in f.readlines()]
+
 
     def __len__(self):
         return len(self.total_files)
     
+
     def __getitem__(self, idx):
-        image_path, mask_path = self.total_files[idx]
+        file_name = self.total_files[idx]
+        image_path = f"{self.image_dir}/{file_name}.jpeg"
+        mask_path = f"{self.mask_dir}/{file_name}.jpeg"
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -67,12 +72,16 @@ class BKAIDataset(Dataset):
         mask = cv2.imread(mask_path)
         
         transformed = self.transform(image=image, mask=mask)
+        image, mask = transformed['image'], transformed['mask']
+        mask = mask_encoding(mask)
+        
+
         if self.feature_extractor is not None:
-            encoded_inputs = self.feature_extractor(transformed['image'], mask_encoding(transformed['mask']), return_tensors="pt")
+            encoded_inputs = self.feature_extractor(image, mask, return_tensors="pt")
             for k, v in encoded_inputs.items():
                 encoded_inputs[k].squeeze_()
 
-            return encoded_inputs
-
+            return encoded_inputs   
+        
         else:
-            return transformed["image"], transformed["mask"]
+            return image, mask

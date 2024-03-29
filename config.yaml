@@ -1,7 +1,10 @@
-data_dir: "/home/pervinco/Datasets/PASCAL_VOC/VOCDevkit" # "/home/pervinco/Datasets/COCO2017"
+## "/home/pervinco/Datasets/COCO2017"
+## "/home/pervinco/Datasets/PASCAL_VOC/VOCDevkit"
+
+data_dir: "/home/pervinco/Datasets/polyp-dataset"
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" # "nvidia/segformer-b0-finetuned-ade-512-512"
-sample_img: "./sample/dog.jpg"
+sample_img: "./sample/polyp.jpg"
 
 epochs: 1000
 img_size: 512
@@ -32,53 +35,3 @@ drop_path_rate: 0.2
 layer_norm_eps: 0.000001
 decoder_hidden_size: 256
 semantic_loss_ignore_index: 255
-
-CLASSES:
-  [
-    "background",
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "potted plant",
-    "sheep",
-    "sofa",
-    "train",
-    "tv/monitor",
-  ]
-
-COLORMAP:
-  [
-    [0, 0, 0],
-    [128, 0, 0],
-    [0, 128, 0],
-    [128, 128, 0],
-    [0, 0, 128],
-    [128, 0, 128],
-    [0, 128, 128],
-    [128, 128, 128],
-    [64, 0, 0],
-    [192, 0, 0],
-    [64, 128, 0],
-    [192, 128, 0],
-    [64, 0, 128],
-    [192, 0, 128],
-    [64, 128, 128],
-    [192, 128, 128],
-    [0, 64, 0],
-    [128, 64, 0],
-    [0, 192, 0],
-    [128, 192, 0],
-    [0, 64, 128],
-  ]

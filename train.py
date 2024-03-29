@@ -13,7 +13,7 @@ from transformers import SegformerForSemanticSegmentation, SegformerImageProcess
 
 from loss import FocalLoss
 from data.voc import VOCDataset
-from data.coco import COCODataset
+from data.bkai import BKAIDataset
 from utils.utils import Args, save_inference_mask, compute_mean_iou, plot_metrics
 
 
@@ -77,7 +77,7 @@ def main(args):
     model_config = SegformerConfig.from_pretrained(args.pretrained_model_name,
                                                    id2label=args.id2label, 
                                                    label2id=args.label2id,
-                                                   num_labels=len(args.CLASSES),
+                                                   num_labels=len(args.classes),
                                                    image_size=args.img_size,
                                                    num_encoder_blocks=args.num_encoder_blocks,
                                                    drop_path_rate=args.drop_path_rate,
@@ -94,11 +94,14 @@ def main(args):
     model.to(args.device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = FocalLoss(num_classes=len(args.CLASSES)).to(args.device)
+    criterion = FocalLoss(num_classes=len(args.classes)).to(args.device)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
 
-    train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
-    valid_dataset = VOCDataset(args, feature_extractor, image_set="test", year=2007)
+    # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
+    # valid_dataset = VOCDataset(args, feature_extractor, image_set="test", year=2007)
+
+    train_dataset = BKAIDataset(args, feature_extractor, image_set="train")
+    valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
@@ -122,7 +125,7 @@ def main(args):
 
         save_inference_mask(args.sample_img, model, feature_extractor, args, epoch)
         if (epoch + 1) % args.mIoU_step == 0:
-            metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.CLASSES), ignore_index=255)
+            metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.classes), ignore_index=255)
             mIoU = metrics_dict["mean_iou"]
             writer.add_scalar('Validation/Mean_IoU', mIoU, epoch)
             print(f"Epoch [{epoch+1}/{args.epochs}] - Mean IoU: {mIoU:.4f}")
@@ -132,8 +135,8 @@ def main(args):
                 torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
                 print(f"mIoU improved, model saved.")
 
-            plot_metrics(metrics_dict, args.CLASSES, "accuracy", f"{args.save_dir}/logs/accuracy_per_class_{epoch:>03}.png")
-            plot_metrics(metrics_dict, args.CLASSES, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
+            plot_metrics(metrics_dict, args.classes, "accuracy", f"{args.save_dir}/logs/accuracy_per_class_{epoch:>03}.png")
+            plot_metrics(metrics_dict, args.classes, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
 
     writer.close()
 
@@ -142,7 +145,10 @@ if __name__ == "__main__":
     args.num_workers = os.cpu_count()
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    id2label = {idx: label for idx, label in enumerate(args.CLASSES)}
+    args.classes = BKAIDataset.CLASSES
+    args.colormap = BKAIDataset.COLORMAP
+
+    id2label = {idx: label for idx, label in enumerate(args.classes)}
     label2id = {label: idx for idx, label in id2label.items()}
     args.id2label = id2label
     args.label2id = label2id
