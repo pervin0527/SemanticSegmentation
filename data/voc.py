@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 from torch.utils.data import Dataset
-from data.augmentation import get_transform
+from data.augmentation import basic_transform
 
 
 class VOCDataset(Dataset):
@@ -25,7 +25,7 @@ class VOCDataset(Dataset):
         self.mask_dir = f"{self.data_dir}/SegmentationClass"
 
         self.feature_extractor = feature_extractor
-        self.transform = get_transform(True if image_set == "train" or image_set == "trainval" else False, img_size=args.img_size)
+        self.transform = basic_transform(True if image_set == "train" or image_set == "trainval" else False, img_size=args.img_size)
 
         with open(f"{self.data_dir}/ImageSets/Segmentation/{image_set}.txt", "r") as file:
             self.file_names = file.read().splitlines()

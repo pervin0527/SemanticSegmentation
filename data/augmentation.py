@@ -1,19 +1,13 @@
 import cv2
+import copy
+import random
+import numpy as np
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
 
-# transform = A.Compose([
-#     A.Resize(height=img_size, width=img_size),
-#     A.HorizontalFlip(p=0.5),
-#     A.VerticalFlip(p=0.5),
-#     A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.7),
-#     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.8),
-#     A.RandomBrightnessContrast(p=0.5),
-#     # A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-#     # ToTensorV2(),
-# ])
+from data.util import mask_encoding, get_bbox_from_mask
 
-def get_transform(is_train, img_size):
+
+def basic_transform(is_train, img_size):
     if is_train:
         transform = A.Compose([
             A.Resize(img_size, img_size, p=1, always_apply=True),
@@ -37,3 +31,94 @@ def get_transform(is_train, img_size):
         ])
 
     return transform
+
+
+def apply_transform(x, y, transform):
+    image, mask = copy.deepcopy(x), copy.deepcopy(y)
+    transformed = transform(image=image, mask=mask)
+    t_image, t_mask = transformed['image'], transformed['mask']
+
+    return t_image, t_mask
+
+
+def mosaic(piecies, size):
+    h, w = size, size
+    mosaic_img = np.zeros((h, w, 3), dtype=np.uint8)
+    mosaic_mask = np.zeros((h, w, 3), dtype=np.uint8)
+
+    # cx, cy = random.randint(w//4, 3*w//4), random.randint(h//4, 3*h//4)
+    cx, cy = w // 2, h // 2
+    
+    indices = [0, 1, 2, 3]
+    random.shuffle(indices)
+    for i, index in enumerate(indices):
+        piece_image, piece_mask = piecies[index][0], piecies[index][1]
+        
+        if i == 0:
+            mosaic_img[:cy, :cx] = cv2.resize(piece_image, (cx, cy))
+            mosaic_mask[:cy, :cx] = cv2.resize(piece_mask, (cx, cy))
+        elif i == 1:
+            mosaic_img[:cy, cx:] = cv2.resize(piece_image, (w-cx, cy))
+            mosaic_mask[:cy, cx:] = cv2.resize(piece_mask, (w-cx, cy))
+        elif i == 2:
+            mosaic_img[cy:, :cx] = cv2.resize(piece_image, (cx, h-cy))
+            mosaic_mask[cy:, :cx] = cv2.resize(piece_mask, (cx, h-cy))
+        elif i == 3:
+            mosaic_img[cy:, cx:] = cv2.resize(piece_image, (w-cx, h-cy))
+            mosaic_mask[cy:, cx:] = cv2.resize(piece_mask, (w-cx, h-cy))
+    
+    return mosaic_img, mosaic_mask
+
+## spatially_exclusive_pasting
+def sep(image, mask, alpha=0.7, iterations=10):
+    augmentation = A.Compose([A.HorizontalFlip(p=0.5),
+                              A.RandomBrightnessContrast(p=0.3),
+                              A.Rotate(limit=30, p=0.2),
+                              A.GaussianBlur(p=0.2)])    
+
+    target_image, target_mask = copy.deepcopy(image), copy.deepcopy(mask)
+    L_gray = cv2.cvtColor(target_mask, cv2.COLOR_BGR2GRAY)
+    
+    encoded_mask = mask_encoding(mask)
+    bounding_boxes = get_bbox_from_mask(encoded_mask)
+    
+    for cls, bboxes in bounding_boxes.items():
+        for idx, bbox in enumerate(bboxes):
+            xmin, ymin, xmax, ymax = bbox[0], bbox[1], bbox[2], bbox[3]
+
+            Lf_gray = L_gray[ymin:ymax, xmin:xmax]
+            If = target_image[ymin:ymax, xmin:xmax]
+            Lf_color = target_mask[ymin:ymax, xmin:xmax]
+
+            # Augmentation
+            augmented = augmentation(image=If, mask=Lf_color)
+            If_augmented = augmented['image']
+            Lf_color_augmented = augmented['mask']
+
+            M = np.random.rand(*target_image.shape[:2])
+            M[L_gray == 1] = float('inf')
+            
+            height, width = ymax - ymin, xmax - xmin
+            
+            for _ in range(iterations):
+                px, py = np.unravel_index(M.argmin(), M.shape)        
+                candidate_area = (slice(px, px + height), slice(py, py + width))
+                
+                if candidate_area[0].stop > target_image.shape[0] or candidate_area[1].stop > target_image.shape[1]:
+                    M[px, py] = float('inf')
+                    continue
+                
+                if np.any(L_gray[candidate_area] & Lf_gray):
+                    M[candidate_area] = float('inf')
+                    continue
+                
+                target_image[candidate_area] = alpha * target_image[candidate_area] + (1 - alpha) * If_augmented
+                target_mask[candidate_area] = alpha * target_mask[candidate_area] + (1 - alpha) * Lf_color_augmented
+                L_gray[candidate_area] = cv2.cvtColor(target_mask[candidate_area], cv2.COLOR_BGR2GRAY)
+                
+                M[candidate_area] = float('inf')
+                
+                kernel = np.ones((3, 3), np.float32) / 9
+                M = cv2.filter2D(M, -1, kernel)
+
+    return target_image, target_mask

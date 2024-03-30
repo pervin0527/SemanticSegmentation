@@ -14,7 +14,7 @@ from transformers import SegformerForSemanticSegmentation, SegformerImageProcess
 from loss import FocalLoss
 from data.voc import VOCDataset
 from data.bkai import BKAIDataset
-from utils.utils import Args, save_inference_mask, compute_mean_iou, plot_metrics
+from utils.utils import Args, inference_callback, compute_mean_iou, plot_metrics
 
 
 def valid(model, dataloader, criterion, device):
@@ -123,7 +123,7 @@ def main(args):
         print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}")
         scheduler.step()
 
-        save_inference_mask(args.sample_img, model, feature_extractor, args, epoch)
+        inference_callback(args.sample_img, model, feature_extractor, args, epoch)
         if (epoch + 1) % args.mIoU_step == 0:
             metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.classes), ignore_index=255)
             mIoU = metrics_dict["mean_iou"]

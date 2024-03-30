@@ -2,14 +2,16 @@
 ## "/home/pervinco/Datasets/PASCAL_VOC/VOCDevkit"
 
 data_dir: "/home/pervinco/Datasets/polyp-dataset"
+sample_img: "/home/pervinco/Datasets/polyp-dataset/test/test/f7fdb2d45b21960c94b0aab4c024a573.jpeg"
+
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" # "nvidia/segformer-b0-finetuned-ade-512-512"
-sample_img: "./sample/polyp.jpg"
 
 epochs: 1000
 img_size: 512
 batch_size: 4
 learning_rate: 0.0001
+spatial_alpha: 0.3
 mIoU_step: 10
 
 lr_patience: 40

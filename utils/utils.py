@@ -50,7 +50,7 @@ class Args:
             print(f"{path} already exists.")
 
 
-def save_inference_mask(image_path, model, feature_extractor, args, epoch):
+def inference_callback(image_path, model, feature_extractor, args, epoch):
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = cv2.resize(image, (args.img_size, args.img_size))
@@ -61,12 +61,7 @@ def save_inference_mask(image_path, model, feature_extractor, args, epoch):
         outputs = model(pixel_values=pixel_values)
     logits = outputs.logits.cpu()
 
-    upsampled_logits = F.interpolate(
-        logits,
-        size=image.shape[:-1],  # (height, width)
-        mode='bilinear',
-        align_corners=False
-    )
+    upsampled_logits = F.interpolate(logits, size=image.shape[:-1], mode='bilinear', align_corners=False)
 
     seg = upsampled_logits.argmax(dim=1)[0]
     color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
