@@ -27,12 +27,14 @@ def valid(model, dataloader, criterion, device):
 
             outputs = model(pixel_values=pixel_values, labels=labels)
             loss, logits = outputs.loss, outputs.logits
-            losses.append(loss.item()) 
-
+            
             upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False) ## mode="nearest"
             predicted = upsampled_logits.argmax(dim=1)
+            
+            loss = criterion(upsampled_logits, labels) ## focal loss
+            losses.append(loss.item()) 
 
-            mask = (labels != 255) # we don't include the background class in the accuracy calculation
+            mask = (labels != 0) # we don't include the background class in the accuracy calculation
             pred_labels = predicted[mask].detach().cpu().numpy()
             true_labels = labels[mask].detach().cpu().numpy()
             accuracy = accuracy_score(pred_labels, true_labels)
@@ -54,14 +56,15 @@ def train(model, dataloader, optimizer, criterion, device):
         outputs = model(pixel_values=pixel_values, labels=labels)
         loss, logits = outputs.loss, outputs.logits
 
-        loss.backward()
-        optimizer.step()
-        losses.append(loss.item())
-        
         upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
         predicted = upsampled_logits.argmax(dim=1)
 
-        mask = (labels != 255) # we don't include the background class in the accuracy calculation
+        loss = criterion(upsampled_logits, labels) ## focal loss
+        loss.backward()
+        optimizer.step()
+        losses.append(loss.item())
+
+        mask = (labels != 0) # we don't include the background class in the accuracy calculation
         pred_labels = predicted[mask].detach().cpu().numpy()
         true_labels = labels[mask].detach().cpu().numpy()
         accuracy = accuracy_score(pred_labels, true_labels)
@@ -69,6 +72,7 @@ def train(model, dataloader, optimizer, criterion, device):
 
     avg_loss = sum(losses) / len(losses)
     avg_acc =  sum(accs) / len(accs)
+
     return avg_loss, avg_acc
     
 
@@ -94,7 +98,7 @@ def main(args):
     model.to(args.device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = FocalLoss(num_classes=len(args.classes)).to(args.device)
+    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
 
     # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)

@@ -15,12 +15,13 @@ class BKAIDataset(Dataset):
     def __init__(self, args, feature_extractor=None, image_set="train"):
         self.args = args
         self.feature_extractor = feature_extractor
+        self.is_train = True if image_set == "train" else False
         
         self.data_dir = args.data_dir
         self.image_dir = f"{self.data_dir}/train/train"
         self.mask_dir = f"{self.data_dir}/train_gt/train_gt"
         self.bbox_dir = f"{self.data_dir}/train_boxes/train_boxes"
-        self.transform = basic_transform(True if image_set == "train" or image_set == "trainval" else False, img_size=args.img_size)
+        self.transform = basic_transform(is_train=self.is_train, img_size=args.img_size)
 
         with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
             self.total_files = [line.strip() for line in f.readlines()]
@@ -37,44 +38,50 @@ class BKAIDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mask = cv2.imread(mask_path)
         
+        labels = []
         bboxes = []
         if os.path.exists(bbox_path):
             with open(bbox_path, 'r') as f:
                 for line in f:
-                    x_min, y_min, x_max, y_max = map(int, line.strip().split())
-                    bboxes.append((x_min, y_min, x_max, y_max))
+                    label, xmin, ymin, xmax, ymax = map(int, line.strip().split())
+                    labels.append(label)
+                    bboxes.append((xmin, ymin, xmax, ymax))
                     
-        return image, mask, bboxes
+        return image, mask, bboxes, labels
 
 
     def __getitem__(self, idx):
-        p = random.random()
+        if self.is_train:
+            p = random.random()
+            if p < 0.3:
+                file_name = self.total_files[idx]
+                image, mask, bboxes, labels = self.get_img_mask(file_name)
+                batch_image, batch_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
 
-        ## basic_transform
-        if p < 0.3:
+            elif 0.3 < p <= 0.6:
+                piecies = []
+                while len(piecies) < 4:
+                    i = random.randint(0, len(self.total_files)-1)
+                    file_name = self.total_files[i]
+                    image, mask, bboxes, labels = self.get_img_mask(file_name)
+
+                    if random.random() > 0.5:
+                        piece_image, piece_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
+                    else:
+                        piece_image, piece_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+                    piecies.append([piece_image, piece_mask])
+
+                batch_image, batch_mask = mosaic(piecies, size=self.args.img_size)
+
+            elif 0.6 < p <= 1:
+                file_name = self.total_files[idx]
+                image, mask, bboxes, labels = self.get_img_mask(file_name)
+                batch_image, batch_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+                
+        else:
             file_name = self.total_files[idx]
-            image, mask, bboxes = self.get_img_mask(file_name)
-            batch_image, batch_mask = apply_transform(image, mask, bboxes, self.transform)
-
-        elif 0.3 < p <= 0.6:
-            piecies = []
-            while len(piecies) < 4:
-                i = random.randint(0, len(self.total_files)-1)
-                file_name = self.total_files[i]
-                image, mask, bboxes = self.get_img_mask(file_name)
-
-                if random.random() > 0.5:
-                    piece_image, piece_mask = apply_transform(image, mask, bboxes, self.transform)
-                else:
-                    piece_image, piece_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
-                piecies.append([piece_image, piece_mask])
-
-            batch_image, batch_mask = mosaic(piecies, size=self.args.img_size)
-
-        elif 0.6 < p <= 1:
-            file_name = self.total_files[idx]
-            image, mask, bboxes = self.get_img_mask(file_name)
-            batch_image, batch_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+            image, mask, bboxes, labels = self.get_img_mask(file_name)
+            batch_image, batch_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
 
         batch_mask = mask_encoding(batch_mask)
         if self.feature_extractor is not None:
