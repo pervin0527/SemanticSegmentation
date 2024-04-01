@@ -2,17 +2,17 @@ data_dir: "/home/pervinco/Datasets/polyp-dataset"
 sample_img: "/home/pervinco/Datasets/polyp-dataset/test/test/4e2a6e51d077bad31c8c5f54ffaa27a6.jpeg"
 
 save_dir: "./runs"
-pretrained_model_name: "nvidia/segformer-b0-finetuned-ade-512-512" ## "nvidia/mit-b0"
+pretrained_model_name: "nvidia/mit-b5" ## "nvidia/mit-b0" "nvidia/segformer-b0-finetuned-ade-512-512"
 
 epochs: 1000
-img_size: 512
-batch_size: 16
-mIoU_step: 10
+img_size: 960
+batch_size: 4
+metric_step: 10
 
 learning_rate: 0.0001
 weight_decay: 0.000001
 
-focal_alpha: [1, 2, 1]
+focal_alpha: null
 spatial_alpha: 0.3
 mixup_alpha: 0.6
 

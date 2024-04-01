@@ -1,6 +1,8 @@
 import torch
+import evaluate
 import numpy as np
 
+from tqdm import tqdm
 from torch import nn
 from torch.nn import functional as F
 
@@ -55,3 +57,80 @@ class FocalLoss(nn.Module):
         elif self.reduction == 'none':
             loss = loss.view(ori_shp)
         return loss
+    
+
+def compute_mean_iou(model, dataloader, device, num_labels, ignore_index=255):
+    model.eval()
+    metric = evaluate.load("mean_dice")
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Computing Mean IoU", leave=False):
+            pixel_values = batch["pixel_values"].to(device)
+            labels = batch["labels"].to(device)
+            outputs = model(pixel_values=pixel_values)
+            logits = outputs.logits
+            upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
+            predicted = upsampled_logits.argmax(dim=1).detach().cpu().numpy()
+            labels = labels.detach().cpu().numpy()
+            
+            # Update metric for each batch
+            metric.add_batch(predictions=predicted, references=labels)
+
+    # Compute the mean IoU over all batches
+    metrics = metric.compute(num_labels=num_labels, ignore_index=ignore_index)
+    per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
+    per_category_iou = metrics.pop("per_category_iou").tolist()
+
+    detailed_metrics = {
+        "mean_iou": metrics["mean_iou"],
+        **{f"accuracy_class_{i}": acc for i, acc in enumerate(per_category_accuracy)},
+        **{f"iou_class_{i}": iou for i, iou in enumerate(per_category_iou)}
+    }
+
+    return detailed_metrics
+
+
+def dice_coefficient(preds, labels, num_classes):
+    """
+    Calculate the Dice coefficient for multiple classes.
+    preds: Predicted tensors (N, H, W) with values indicating class predictions.
+    labels: Ground truth tensors (N, H, W) with actual class labels.
+    num_classes: The number of classes.
+    """
+    dice_scores = []
+    epsilon = 1e-7
+
+    for class_id in range(num_classes):
+        # Create binary masks for the current class
+        pred_mask = (preds == class_id)
+        label_mask = (labels == class_id)
+        
+        intersection = (pred_mask & label_mask).sum()
+        union = pred_mask.sum() + label_mask.sum()
+        
+        dice_score = (2. * intersection + epsilon) / (union + epsilon)
+        dice_scores.append(dice_score)
+
+    # Calculate the average Dice coefficient across all classes
+    mean_dice = sum(dice_scores) / num_classes
+    return mean_dice
+
+def compute_mean_dice_coefficient_score(model, dataloader, device, num_classes):
+    model.eval()
+    total_dice = 0
+    count = 0
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Computing Mean Dice Coefficient", leave=False):
+            pixel_values = batch["pixel_values"].to(device)
+            labels = batch["labels"].to(device)
+            outputs = model(pixel_values=pixel_values)
+            logits = outputs.logits
+            upsampled_logits = torch.nn.functional.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
+            predicted = upsampled_logits.argmax(dim=1)
+
+            dice_score = dice_coefficient(predicted.cpu(), labels.cpu(), num_classes)
+            total_dice += dice_score.item()
+            count += 1
+
+    mean_dice = total_dice / count
+    return mean_dice

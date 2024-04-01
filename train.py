@@ -11,10 +11,10 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from transformers import SegformerForSemanticSegmentation, SegformerImageProcessor, SegformerConfig
 
-from loss import FocalLoss
 from data.voc import VOCDataset
 from data.bkai import BKAIDataset
-from utils.utils import Args, inference_callback, compute_mean_iou, plot_metrics
+from loss import FocalLoss, compute_mean_iou, compute_mean_dice_coefficient_score
+from utils.utils import Args, inference_callback, plot_metrics
 
 
 def valid(model, dataloader, criterion, device, ignore_idx=0):
@@ -31,7 +31,7 @@ def valid(model, dataloader, criterion, device, ignore_idx=0):
             upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False) ## mode="nearest"
             predicted = upsampled_logits.argmax(dim=1)
             
-            # loss = criterion(upsampled_logits, labels) ## focal loss
+            loss = criterion(upsampled_logits, labels) ## focal loss
             losses.append(loss.item()) 
 
             mask = (labels != ignore_idx) # we don't include the background class in the accuracy calculation
@@ -59,7 +59,7 @@ def train(model, dataloader, optimizer, criterion, device, ignore_idx=0):
         upsampled_logits = F.interpolate(logits, size=labels.shape[-2:], mode="bilinear", align_corners=False)
         predicted = upsampled_logits.argmax(dim=1)
 
-        # loss = criterion(upsampled_logits, labels) ## focal loss
+        loss = criterion(upsampled_logits, labels) ## focal loss
         loss.backward()
         optimizer.step()
         losses.append(loss.item())
@@ -90,7 +90,6 @@ def main(args):
                                                    attention_probs_dropout_prob=args.attention_probs_dropout_prob,
                                                    semantic_loss_ignore_index=args.semantic_loss_ignore_index)
     model_config.save_pretrained(f'{args.save_dir}')
-
     feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
     model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name,
                                                              config=model_config,
@@ -99,7 +98,6 @@ def main(args):
 
     # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
     # valid_dataset = VOCDataset(args, feature_extractor, image_set="test", year=2007)
-
     train_dataset = BKAIDataset(args, feature_extractor, image_set="train")
     valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
 
@@ -107,11 +105,11 @@ def main(args):
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, ignore_index=args.semantic_loss_ignore_index, reduction='mean').to(args.device)
+    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
-    best_mIoU = 0.0
+    best_metric_score = 0.0
     for epoch in range(args.epochs):
         current_lr = optimizer.param_groups[0]['lr']
         print(f"\nEpoch : [{epoch+1:>03}|{args.epochs}], LR : {current_lr}")
@@ -129,19 +127,22 @@ def main(args):
         scheduler.step()
 
         inference_callback(args.sample_img, model, feature_extractor, args, epoch)
-        if (epoch + 1) % args.mIoU_step == 0:
-            metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.classes), ignore_index=255)
-            mIoU = metrics_dict["mean_iou"]
-            writer.add_scalar('Validation/Mean_IoU', mIoU, epoch)
-            print(f"Epoch [{epoch+1}/{args.epochs}] - Mean IoU: {mIoU:.4f}")
+        if (epoch + 1) % args.metric_step == 0:
+            # metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.classes), ignore_index=255)
+            # metric_score = metrics_dict["mean_iou"]
 
-            if mIoU > best_mIoU:
-                best_mIoU = mIoU
+            metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
+
+            writer.add_scalar('Validation/metric score', metric_score, epoch)
+            print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
+
+            if metric_score > best_metric_score:
+                best_metric_score = metric_score
                 torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
-                print(f"mIoU improved, model saved.")
+                print(f"best metric improved, model saved.")
 
-            plot_metrics(metrics_dict, args.classes, "accuracy", f"{args.save_dir}/logs/accuracy_per_class_{epoch:>03}.png")
-            plot_metrics(metrics_dict, args.classes, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
+            # plot_metrics(metrics_dict, args.classes, "accuracy", f"{args.save_dir}/logs/accuracy_per_class_{epoch:>03}.png")
+            # plot_metrics(metrics_dict, args.classes, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
 
     writer.close()
 
