@@ -146,3 +146,29 @@ def sep(image, mask, alpha=0.7, iterations=10):
                 M = cv2.filter2D(M, -1, kernel)
 
     return target_image, target_mask
+
+
+def mixup(foreground_image, background_image, alpha):
+    image1, image2 = copy.deepcopy(foreground_image), copy.deepcopy(background_image)
+
+    height, width = image1.shape[:2]
+    background_transform = A.Compose([A.RandomRotate90(p=0.5),
+                                      A.VerticalFlip(p=0.3),
+                                      A.HorizontalFlip(p=0.3),
+                                      A.RandomBrightnessContrast(p=0.6),
+                                      A.Resize(height=height, width=width, p=1)])
+    
+    transformed = background_transform(image=image2)
+    transformed_image = transformed["image"]
+
+    mixed_image = cv2.addWeighted(image1, alpha, transformed_image, 1 - alpha, 0)   
+    
+    return mixed_image
+
+
+def get_bg_image(bg_files):
+    bg_idx = random.randint(0, len(bg_files) - 1)
+    background_image = cv2.imread(bg_files[bg_idx])
+    background_image = cv2.cvtColor(background_image, cv2.COLOR_BGR2RGB)
+
+    return background_image

@@ -3,10 +3,11 @@ import cv2
 import random
 import numpy as np
 
+from glob import glob
 from torch.utils.data import Dataset
 
 from data.util import mask_encoding
-from data.augmentation import basic_transform, apply_transform, sep, mosaic
+from data.augmentation import basic_transform, apply_transform, sep, mosaic, mixup, get_bg_image
 
 class BKAIDataset(Dataset):
     CLASSES = ["background", "non-neoplastic polyps", "neoplastic polyps"]
@@ -25,6 +26,8 @@ class BKAIDataset(Dataset):
 
         with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
             self.total_files = [line.strip() for line in f.readlines()]
+
+        self.bg_files = glob(f"{self.data_dir}/background/0_normal/*.jpg")
 
     def __len__(self):
         return len(self.total_files)
@@ -58,6 +61,10 @@ class BKAIDataset(Dataset):
                 image, mask, bboxes, labels = self.get_img_mask(file_name)
                 batch_image, batch_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
 
+                if random.random() > 0.7:
+                    background_image = get_bg_image(self.bg_files)
+                    batch_image = mixup(batch_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
+
             elif 0.3 < p <= 0.6:
                 piecies = []
                 while len(piecies) < 4:
@@ -69,6 +76,11 @@ class BKAIDataset(Dataset):
                         piece_image, piece_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
                     else:
                         piece_image, piece_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+
+                    if random.random() > 0.7:
+                        background_image = get_bg_image(self.bg_files)
+                        piece_image = mixup(piece_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
+
                     piecies.append([piece_image, piece_mask])
 
                 batch_image, batch_mask = mosaic(piecies, size=self.args.img_size)
@@ -77,6 +89,10 @@ class BKAIDataset(Dataset):
                 file_name = self.total_files[idx]
                 image, mask, bboxes, labels = self.get_img_mask(file_name)
                 batch_image, batch_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+
+                if random.random() > 0.7:
+                    background_image = get_bg_image(self.bg_files)
+                    batch_image = mixup(batch_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
                 
         else:
             file_name = self.total_files[idx]
