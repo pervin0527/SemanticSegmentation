@@ -63,7 +63,7 @@ class BKAIDataset(Dataset):
 
                 if random.random() > 0.7:
                     background_image = get_bg_image(self.bg_files)
-                    batch_image = mixup(batch_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
+                    batch_image = mixup(batch_image, background_image, img_size=self.args.img_size, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
 
             elif 0.3 < p <= 0.6:
                 piecies = []
@@ -75,24 +75,23 @@ class BKAIDataset(Dataset):
                     if random.random() > 0.5:
                         piece_image, piece_mask, batch_bboxes, batch_labels = apply_transform(image, mask, bboxes, labels, self.transform)
                     else:
-                        piece_image, piece_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
-
-                    if random.random() > 0.7:
-                        background_image = get_bg_image(self.bg_files)
-                        piece_image = mixup(piece_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
+                        piece_image, piece_mask = sep(image, mask, self.args.img_size, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
 
                     piecies.append([piece_image, piece_mask])
 
                 batch_image, batch_mask = mosaic(piecies, size=self.args.img_size)
+                if random.random() > 0.7:
+                    background_image = get_bg_image(self.bg_files)
+                    piece_image = mixup(batch_image, background_image, img_size=self.args.img_size, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
 
             elif 0.6 < p <= 1:
                 file_name = self.total_files[idx]
                 image, mask, bboxes, labels = self.get_img_mask(file_name)
-                batch_image, batch_mask = sep(image, mask, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
+                batch_image, batch_mask = sep(image, mask, self.args.img_size, alpha=random.uniform(self.args.spatial_alpha, self.args.spatial_alpha + 0.2))
 
                 if random.random() > 0.7:
                     background_image = get_bg_image(self.bg_files)
-                    batch_image = mixup(batch_image, background_image, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
+                    batch_image = mixup(batch_image, background_image, img_size=self.args.img_size, alpha=random.uniform(self.args.mixup_alpha, self.args.mixup_alpha + 0.3))
                 
         else:
             file_name = self.total_files[idx]

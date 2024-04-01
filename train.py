@@ -64,7 +64,7 @@ def train(model, dataloader, optimizer, criterion, device, ignore_idx=0):
         optimizer.step()
         losses.append(loss.item())
 
-        mask = (labels != 0) # we don't include the background class in the accuracy calculation
+        mask = (labels != ignore_idx) # we don't include the background class in the accuracy calculation
         pred_labels = predicted[mask].detach().cpu().numpy()
         true_labels = labels[mask].detach().cpu().numpy()
         accuracy = accuracy_score(pred_labels, true_labels)
@@ -91,7 +91,7 @@ def main(args):
                                                    semantic_loss_ignore_index=args.semantic_loss_ignore_index)
     model_config.save_pretrained(f'{args.save_dir}')
 
-    feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=False)
+    feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
     model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name,
                                                              config=model_config,
                                                              ignore_mismatched_sizes=True)

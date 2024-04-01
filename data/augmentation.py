@@ -12,20 +12,18 @@ def basic_transform(is_train, img_size):
         transform = A.Compose([
             A.OneOf([
                 A.Resize(img_size, img_size, p=0.25),
-                A.RandomCrop(img_size, img_size, p=0.25),
+                # A.RandomCrop(img_size, img_size, p=0.25),
                 A.RandomSizedBBoxSafeCrop(img_size, img_size, p=0.25),
-                A.Compose([
-                    A.RandomSizedBBoxSafeCrop(height=img_size//2, width=img_size//2, p=1),
-                    A.PadIfNeeded(min_height=img_size, min_width=img_size, border_mode=0, p=1)
-                ], p=0.25)
-
-            ]),
+                # A.Compose([
+                    # A.RandomSizedBBoxSafeCrop(height=img_size//2, width=img_size//2, p=1),
+                    # A.PadIfNeeded(min_height=img_size, min_width=img_size, border_mode=0, p=1)], p=0.25)
+            ], p=1),
 
             A.OneOf([
                 A.HorizontalFlip(p=0.25),
                 A.VerticalFlip(p=0.25),
                 A.ElasticTransform(p=0.25, border_mode=0),
-                A.ShiftScaleRotate(p=0.25, border_mode=0, shift_limit=0.15, scale_limit=0.15, rotate_limit=180),
+                A.ShiftScaleRotate(p=0.25, border_mode=0, shift_limit=0.15, scale_limit=0.15, rotate_limit=0),
             ], p=1),
             
             A.OneOf([
@@ -37,7 +35,7 @@ def basic_transform(is_train, img_size):
                 A.Sharpen(), 
                 A.MedianBlur(), 
                 A.MultiplicativeNoise()
-            ]),
+            ], p=1),
 
             A.RandomBrightnessContrast(p=0.5),
             A.RandomGamma (gamma_limit=(70, 130), eps=None, always_apply=False, p=0.2),
@@ -51,7 +49,7 @@ def basic_transform(is_train, img_size):
 
     else:
         transform = A.Compose([
-            A.Resize(height=img_size, width=img_size),
+            A.Resize(height=img_size, width=img_size, p=1, always_apply=True),
         ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['labels']))
 
     return transform
@@ -94,11 +92,9 @@ def mosaic(piecies, size):
     return mosaic_img, mosaic_mask
 
 ## spatially_exclusive_pasting
-def sep(image, mask, alpha=0.7, iterations=10):
-    augmentation = A.Compose([A.HorizontalFlip(p=0.5),
-                              A.RandomBrightnessContrast(p=0.3),
-                              A.Rotate(limit=30, border_mode=0, p=0.2),
-                              A.GaussianBlur(p=0.2)])    
+def sep(image, mask, img_size, alpha=0.7, iterations=10):
+    augmentation = A.Compose([A.RandomBrightnessContrast(p=0.3),
+                              A.GaussianBlur(p=0.2),])    
 
     target_image, target_mask = copy.deepcopy(image), copy.deepcopy(mask)
     L_gray = cv2.cvtColor(target_mask, cv2.COLOR_BGR2GRAY)
@@ -145,10 +141,11 @@ def sep(image, mask, alpha=0.7, iterations=10):
                 kernel = np.ones((3, 3), np.float32) / 9
                 M = cv2.filter2D(M, -1, kernel)
 
+    target_image, target_mask = cv2.resize(target_image, (img_size, img_size)), cv2.resize(target_mask, (img_size, img_size))
     return target_image, target_mask
 
 
-def mixup(foreground_image, background_image, alpha):
+def mixup(foreground_image, background_image, img_size, alpha):
     image1, image2 = copy.deepcopy(foreground_image), copy.deepcopy(background_image)
 
     height, width = image1.shape[:2]
@@ -156,7 +153,9 @@ def mixup(foreground_image, background_image, alpha):
                                       A.VerticalFlip(p=0.3),
                                       A.HorizontalFlip(p=0.3),
                                       A.RandomBrightnessContrast(p=0.6),
-                                      A.Resize(height=height, width=width, p=1)])
+                                      A.RGBShift(p=0.3),
+                                      A.Resize(img_size, img_size, p=1, always_apply=True)
+                                      ])
     
     transformed = background_transform(image=image2)
     transformed_image = transformed["image"]
