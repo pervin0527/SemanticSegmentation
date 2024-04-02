@@ -4,13 +4,14 @@ sample_img: "/home/pervinco/Datasets/polyp-dataset/test/test/4e2a6e51d077bad31c8
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" ## "nvidia/mit-b0" "nvidia/segformer-b0-finetuned-ade-512-512"
 
-epochs: 1000
+epochs: 500
 img_size: 960
 batch_size: 4
 metric_step: 10
 
-learning_rate: 0.0001
+learning_rate: 0.00001
 weight_decay: 0.000001
+warmup_epochs: 200
 
 focal_alpha: null
 spatial_alpha: 0.3
@@ -18,6 +19,7 @@ mixup_alpha: 0.6
 
 lr_patience: 40
 min_lr: 0.000001
+max_lr: 0.001
 T_0: 200
 T_mult: 2
 
@@ -36,8 +38,8 @@ initializer_range: 0.02
 
 do_reduce_labels: False
 semantic_loss_ignore_index: 255
-hidden_dropout_prob: 0.4 ## 0.0
-attention_probs_dropout_prob: 0.2 ## 0.0
-classifier_dropout_prob: 0.3 ## 0.1
-drop_path_rate: 0.3 ## 0.1
+hidden_dropout_prob: 0.5 ## 0.0
+attention_probs_dropout_prob: 0.3 ## 0.0
+classifier_dropout_prob: 0.4 ## 0.1
+drop_path_rate: 0.4 ## 0.1
 decoder_hidden_size: 768 ## 256

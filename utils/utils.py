@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime
 from torch.nn import functional as F
-
+from torch.optim.lr_scheduler import _LRScheduler
 
 class Args:
     def __init__(self, hyp_dir, is_train=False):
@@ -105,3 +105,20 @@ def plot_metrics(detailed_metrics, class_names, metric_name, save_path):
     plt.tight_layout()  # 레이블이 잘리지 않도록 조정
     plt.savefig(save_path)
     plt.close()
+
+class WarmupThenDecayScheduler(_LRScheduler):
+    def __init__(self, optimizer, warmup_epochs, total_epochs, min_lr, max_lr, last_epoch=-1):
+        self.warmup_epochs = warmup_epochs
+        self.total_epochs = total_epochs
+        self.min_lr = min_lr
+        self.max_lr = max_lr  # 최대 학습률을 추가합니다.
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        if self.last_epoch < self.warmup_epochs:
+            warmup_factor = (self.max_lr / self.base_lrs[0])
+            return [base_lr * warmup_factor * (self.last_epoch + 1) / self.warmup_epochs for base_lr in self.base_lrs]
+        else:
+            decay_rate = (1 - ((self.last_epoch - self.warmup_epochs) / (self.total_epochs - self.warmup_epochs)))
+            decay_rate = min(max(decay_rate, 0), 1)
+            return [self.min_lr + (self.max_lr - self.min_lr) * decay_rate for _ in self.base_lrs]

@@ -14,7 +14,7 @@ from transformers import SegformerForSemanticSegmentation, SegformerImageProcess
 from data.voc import VOCDataset
 from data.bkai import BKAIDataset
 from loss import FocalLoss, compute_mean_iou, compute_mean_dice_coefficient_score
-from utils.utils import Args, inference_callback, plot_metrics
+from utils.utils import Args, inference_callback, plot_metrics, WarmupThenDecayScheduler
 
 
 def valid(model, dataloader, criterion, device, ignore_idx=0):
@@ -106,7 +106,9 @@ def main(args):
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+
+    scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
     best_metric_score = 0.0
@@ -145,6 +147,7 @@ def main(args):
             # plot_metrics(metrics_dict, args.classes, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
 
     writer.close()
+    torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')
 
 if __name__ == "__main__":
     args = Args("./config.yaml", is_train=True)
