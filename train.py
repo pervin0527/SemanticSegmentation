@@ -107,8 +107,8 @@ def main(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
 
-    scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+    # scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
     best_metric_score = 0.0

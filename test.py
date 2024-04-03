@@ -124,7 +124,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "./runs/2024_04_01_22_42_03"
+    saved_dir = "./runs/2024_04_02_14_23_22"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir
