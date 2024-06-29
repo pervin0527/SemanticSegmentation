@@ -10,7 +10,7 @@ from torch.nn import functional as F
 from torch.optim.lr_scheduler import _LRScheduler
 
 class Args:
-    def __init__(self, hyp_dir, is_train=False):
+    def __init__(self, hyp_dir, is_train=False, is_cv=False):
         self.hyp_dir = hyp_dir  # hyp_dir을 인스턴스 변수로 저장
         self.hyps = self.load_config(hyp_dir)  # 설정 파일 로드
         for key, value in self.hyps.items():
@@ -21,7 +21,11 @@ class Args:
             base_save_dir = self.hyps.get("save_dir", "./saved_configs")
             self.save_dir = os.path.join(base_save_dir, current_time)
             
-            self.make_dir(self.save_dir)
+            if not is_cv:
+                self.make_dir(self.save_dir)
+            else:
+                os.makedirs(self.save_dir)
+                
             self.save_config()
 
     def load_config(self, config_path):
@@ -48,7 +52,7 @@ class Args:
             print(f"{path} already exists.")
 
 
-def inference_callback(image_path, model, feature_extractor, args, epoch):
+def inference_callback(image_path, model, feature_extractor, args, epoch, save_dir):
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = cv2.resize(image, (args.img_size, args.img_size))
@@ -82,7 +86,7 @@ def inference_callback(image_path, model, feature_extractor, args, epoch):
     axs[2].axis('off')
 
     plt.tight_layout()
-    plt.savefig(f"{args.save_dir}/images/EP{epoch:>04}.jpg")
+    plt.savefig(f"{save_dir}/images/EP{epoch:>04}.jpg")
     plt.close()
 
 

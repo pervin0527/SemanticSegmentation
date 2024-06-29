@@ -98,8 +98,11 @@ def main(args):
         print(f"Fold {fold+1}")
 
         fold_save_dir = os.path.join(args.save_dir, f'fold_{fold+1}')
-        os.makedirs(fold_save_dir, exist_ok=True)
-        writer = SummaryWriter(log_dir=os.path.join(fold_save_dir, 'logs'))
+        os.makedirs(f"{fold_save_dir}/images")
+        os.makedirs(f"{fold_save_dir}/weights")
+        os.makedirs(f"{fold_save_dir}/logs")
+        os.makedirs(f"{fold_save_dir}/test")
+        writer = SummaryWriter(log_dir=f"{fold_save_dir}/logs")
 
         train_subset = Subset(full_dataset, train_idx)
         val_subset = Subset(full_dataset, val_idx)
@@ -117,7 +120,6 @@ def main(args):
 
         epochs_no_improve = 0
         best_metric_score = 0.0
-        best_valid_loss = float('inf')
         for epoch in range(args.epochs):
             current_lr = optimizer.param_groups[0]['lr']
             print(f"\nEpoch : [{epoch+1:>03}|{args.epochs}], LR : {current_lr}")
@@ -134,7 +136,7 @@ def main(args):
             print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}")
             scheduler.step()
 
-            inference_callback(args.sample_img, model, feature_extractor, args, epoch)
+            inference_callback(args.sample_img, model, feature_extractor, args, epoch, fold_save_dir)
             if (epoch + 1) % args.metric_step == 0:
                 metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
                 writer.add_scalar(f'Fold_{fold+1}/Validation/metric score', metric_score, epoch)
@@ -144,13 +146,9 @@ def main(args):
                     best_metric_score = metric_score
                     torch.save(model.state_dict(), os.path.join(fold_save_dir, 'weights', 'best.pt'))
                     print(f"best metric improved, model saved.")
-                
-            # Early Stopping Check
-            if valid_loss < best_valid_loss:
-                best_valid_loss = valid_loss
-                epochs_no_improve = 0
-            else:
-                epochs_no_improve += 1
+                    epochs_no_improve = 0
+                else:
+                    epochs_no_improve += 1
 
             if epochs_no_improve >= args.early_stop_patience:
                 print("Early stopping")
@@ -160,7 +158,7 @@ def main(args):
         torch.save(model.state_dict(), os.path.join(fold_save_dir, 'weights', 'last.pt'))
 
 if __name__ == "__main__":
-    args = Args("./config.yaml", is_train=True)
+    args = Args("./config.yaml", is_train=True, is_cv=True)
     args.num_workers = os.cpu_count()
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     args.seed = 42  # Seed for reproducibility

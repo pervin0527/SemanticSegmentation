@@ -16,6 +16,21 @@
 3. 학습이 시작되면 `SemanticSegmentation/runs` 디렉터리가 생성될 것이며, train.py를 실행한 날짜에 해당하는 폴더가 만들어집니다.
 4. 학습이 끝나면 `test.py`에서 127번째 라인 `saved_dir = "./runs/2024_04_02_14_23_22"` 을 수정하고 실행시킵니다.
 
+## 2.문제 분석
+
+<img src="./images/problem0.png" width="1674" height="630">
+
+이 대회는 입력된 이미지에서 폴립(Polyp) 영역에 존재하는 픽셀들을 분류하는 Semantic Segmentation Task입니다.  
+모든 폴립은 빨간색과 녹색으로 표시되는 마스크 데이터가 존재하며 빨간색은 신생물 폴립(NeoPolyp), 초록색은 비신생물 폴립(Non NeoPolyp) 클래스로 분류됩니다.
+
+<img src="./images/problem1.png" width="1674" height="630">
+
+test 데이터셋을 학습된 모델에 입력시켰을 때 발생하는 추론 마스크 $X$를 저장한 다음, 정답 마스크 $Y$와 mean Dice Coefficient을 평가하게 됩니다.
+
+- 분모는 두 마스크의 픽셀들을 모두 더한 값인데, 마스크의 height, width는 같으니까 결국 픽셀 수 \* 2인 셈.
+- 분자는 두 마스크에서 일치하는 픽셀의 수에 2를 곱한 값이므로 예측의 정확도가 높을 수록 분모와 분자가 같아져 1에 가까워집니다.
+- 결과적으로 정확한 픽셀단위 분류 모델을 만들수록 높은 평가 점수를 받을 수 있습니다.
+
 ## 2.Data Analysis
 
 ### 2-1.Basic Dataset
@@ -38,8 +53,8 @@ Label인 mask는 .png 형식의 파일이며 background(black), neoplastic polyp
 ### 2-3.Data Distribution
 
 <img src="./images/output4.png">
-각각의 마스크마다 빨간색, 초록색 또는 빨간색과 초록색이 함께 있는 이미지의 분포를 확인해보면 693, 257, 50개로 불균형적임을 확인할 수 있다.  
-또한, 전체 데이터셋이 1000개로 규모가 매우 작기 때문에 Cross Validation을 적용해 학습하는 전략을 취하는 것이 좋아 보인다.
+
+각각의 마스크마다 빨간색, 초록색 또는 빨간색과 초록색이 함께 있는 이미지의 분포를 확인해보면 693, 257, 50개로 불균형적임을 확인할 수 있으며 전체 데이터셋이 1000개로 규모가 매우 작기 때문에 Cross Validation을 적용해 학습하는 전략을 취하는 것이 좋아 보입니다.
 
 ### 2-4.Spatially Exclusive Paste
 
@@ -56,7 +71,7 @@ class imbalance를 해결하기 위한 방법 중 하나로, 기존의 copy-past
 
 ### 3-1.Focal Loss
 
-$ FL(p_t)= -\alpha_t(1-p_t)^\gamma log(p_t) $
+$$ FL(p_t)= -\alpha_t(1-p_t)^\gamma log(p_t) $$
 
 - $p_t$ 는 모델이 정답 클래스에 대해 예측한 확률로, 정답 클래스에 대해서는 $p_t$를 그대로 사용하고, 잘못된 클래스에 대해서는 $1-p_t$를 사용합니다.
 - $\alpha_t$는 클래스별 가중치로 클래스마다 서로 다른 가중치를 적용할수 있도록 합니다.

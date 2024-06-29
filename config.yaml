@@ -9,7 +9,7 @@ num_workers: 32
 epochs: 1000
 img_size: 960
 batch_size: 4
-metric_step: 10
+metric_step: 5
 
 learning_rate: 0.0001
 weight_decay: 0.000001
