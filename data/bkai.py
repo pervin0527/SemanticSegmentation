@@ -19,20 +19,23 @@ class BKAIDataset(Dataset):
         self.is_train = True if image_set == "train" else False
         
         self.data_dir = args.data_dir
-        self.image_dir = f"{self.data_dir}/train/train"
-        self.mask_dir = f"{self.data_dir}/train_gt/train_gt"
-        self.bbox_dir = f"{self.data_dir}/train_boxes/train_boxes"
+        self.image_dir = f"{self.data_dir}/train"
+        self.mask_dir = f"{self.data_dir}/train_gt"
+        self.bbox_dir = f"{self.data_dir}/train_boxes"
         self.transform = basic_transform(is_train=self.is_train, img_size=args.img_size)
 
-        with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
-            self.total_files = [line.strip() for line in f.readlines()]
-
-        self.bg_files = glob(f"{self.data_dir}/background/0_normal/*.jpg")
+        # with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
+        #     self.total_files = [line.strip() for line in f.readlines()]
+        
+        self.total_files = os.listdir(self.image_dir)
+        print(len(self.total_files))
+        self.bg_files = glob(f"{self.data_dir}/backgrounds/train/0_normal/*.jpg")
 
     def __len__(self):
         return len(self.total_files)
 
     def get_img_mask(self, file_name):
+        file_name = file_name.split('.')[0]
         image_path = f"{self.image_dir}/{file_name}.jpeg"
         mask_path = f"{self.mask_dir}/{file_name}.jpeg"
         bbox_path = f"{self.bbox_dir}/{file_name}.txt"

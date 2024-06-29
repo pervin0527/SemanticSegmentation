@@ -1,9 +1,11 @@
-data_dir: "/home/pervinco/Datasets/polyp-dataset"
-sample_img: "/home/pervinco/Datasets/polyp-dataset/test/test/4e2a6e51d077bad31c8c5f54ffaa27a6.jpeg"
+data_dir: "/home/pervinco/Datasets/BKAI_IGH_NeoPolyp"
+sample_img: "/home/pervinco/Datasets/BKAI_IGH_NeoPolyp/test/4e2a6e51d077bad31c8c5f54ffaa27a6.jpeg"
 
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" ## "nvidia/mit-b0" "nvidia/segformer-b0-finetuned-ade-512-512"
 
+num_folds: 5
+num_workers: 32
 epochs: 1000
 img_size: 960
 batch_size: 4
@@ -12,6 +14,7 @@ metric_step: 10
 learning_rate: 0.0001
 weight_decay: 0.000001
 warmup_epochs: 200
+early_stop_patience: 10
 
 focal_alpha: null
 spatial_alpha: 0.3
