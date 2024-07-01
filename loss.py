@@ -6,6 +6,51 @@ from tqdm import tqdm
 from torch import nn
 from torch.nn import functional as F
 
+class DiceLoss(nn.Module):
+    def __init__(self, smooth=1e-6):
+        super().__init__()
+        self.smooth = smooth
+
+    def forward(self, logits, targets):
+        num_classes = logits.shape[1]
+        dice = 0
+
+        logits = torch.softmax(logits, dim=1)
+        targets = torch.nn.functional.one_hot(targets, num_classes=num_classes).permute(0, 3, 1, 2).contiguous()
+        
+        for i in range(num_classes):
+            iflat = logits[:, i].contiguous().view(-1)
+            tflat = targets[:, i].contiguous().view(-1)
+            intersection = (iflat * tflat).sum()
+            
+            dice += (2. * intersection + self.smooth) / (iflat.sum() + tflat.sum() + self.smooth)
+
+        return 1 - dice / num_classes
+
+
+
+class JaccardLoss(nn.Module):
+    def __init__(self, smooth=1e-6):
+        super(JaccardLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, logits, targets):
+        num_classes = logits.shape[1]
+        jaccard = 0
+
+        logits = torch.softmax(logits, dim=1)
+        targets = torch.nn.functional.one_hot(targets, num_classes=num_classes).permute(0, 3, 1, 2).contiguous()
+        for i in range(num_classes):
+            iflat = logits[:, i].contiguous().view(-1)
+            tflat = targets[:, i].contiguous().view(-1)
+            intersection = (iflat * tflat).sum()
+            union = iflat.sum() + tflat.sum() - intersection
+            
+            jaccard += (intersection + self.smooth) / (union + self.smooth)
+
+        return 1 - jaccard / num_classes
+
+
 class FocalLoss(nn.Module):
     def __init__(self, num_class, alpha=None, gamma=2, ignore_index=None, reduction='mean'):
         super().__init__()
