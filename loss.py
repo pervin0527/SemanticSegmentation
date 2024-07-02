@@ -28,7 +28,6 @@ class DiceLoss(nn.Module):
         return 1 - dice / num_classes
 
 
-
 class JaccardLoss(nn.Module):
     def __init__(self, smooth=1e-6):
         super(JaccardLoss, self).__init__()
@@ -158,6 +157,7 @@ def dice_coefficient(preds, labels, num_classes):
     # Calculate the average Dice coefficient across all classes
     mean_dice = sum(dice_scores) / num_classes
     return mean_dice
+
 
 def compute_mean_dice_coefficient_score(model, dataloader, device, num_classes):
     model.eval()
