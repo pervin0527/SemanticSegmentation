@@ -94,27 +94,22 @@ def train(model, dataloader, optimizer, criterion, device, num_classes, ignore_i
 
 def main(args):
     writer = SummaryWriter(log_dir=f"{args.save_dir}/logs")
-    model_config = SegformerConfig.from_pretrained(
-        args.pretrained_model_name,
-        id2label=args.id2label, 
-        label2id=args.label2id,
-        num_labels=len(args.classes),
-        image_size=args.img_size,
-        num_encoder_blocks=args.num_encoder_blocks,
-        drop_path_rate=args.drop_path_rate,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        classifier_dropout_prob=args.classifier_dropout_prob,
-        attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-        semantic_loss_ignore_index=args.semantic_loss_ignore_index
-    )
+    model_config = SegformerConfig.from_pretrained(args.pretrained_model_name,
+                                                   id2label=args.id2label, 
+                                                   label2id=args.label2id,
+                                                   num_labels=len(args.classes),
+                                                   image_size=args.img_size,
+                                                   num_encoder_blocks=args.num_encoder_blocks,
+                                                   drop_path_rate=args.drop_path_rate,
+                                                   hidden_dropout_prob=args.hidden_dropout_prob,
+                                                   classifier_dropout_prob=args.classifier_dropout_prob,
+                                                   attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+                                                   semantic_loss_ignore_index=args.semantic_loss_ignore_index)
     model_config.save_pretrained(f'{args.save_dir}')
-    
     feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
     model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name,
                                                              config=model_config,
                                                              ignore_mismatched_sizes=True)
-
-    model = SegformerForSemanticSegmentation(config=model_config)
     model.to(args.device)
 
     # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
@@ -127,15 +122,13 @@ def main(args):
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
-    # criterion = DiceLoss()
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=args.lr_patience, factor=args.lr_factor, verbose=True)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
     # scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
     epochs_no_improve = 0
-    minimum_valid_loss = float('inf')
+    max_dice_coefficient = 0.0
     for epoch in range(args.epochs):
         current_lr = optimizer.param_groups[0]['lr']
         print(f"\nEpoch : [{epoch+1:>03}|{args.epochs}], LR : {current_lr}")
@@ -150,23 +143,22 @@ def main(args):
         writer.add_scalar('Validation/Loss', valid_loss, epoch)
         writer.add_scalar('Validation/Dice', valid_dice, epoch)
         print(f"Valid Loss : {valid_loss:.4f}, Valid Dice : {valid_dice:.4f}")
-
         inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=f"{args.save_dir}")
 
         # scheduler.step()
-        scheduler.step(valid_loss)
-        if valid_loss < minimum_valid_loss:
-            minimum_valid_loss = valid_loss
+        scheduler.step()
+        if valid_dice > max_dice_coefficient:
+            max_dice_coefficient = valid_dice
             torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
-            print(f"{minimum_valid_loss:.4f} valid loss updated, model saved.")
-            epochs_no_improve = 0
-        else:
-            print(f"model not improved. Early stopping patience : {epochs_no_improve}")
-            epochs_no_improve += 1
+            print(f"{max_dice_coefficient:.4f} model improved, weight saved.")
+        #     epochs_no_improve = 0
+        # else:
+        #     epochs_no_improve += 1
+        #     print(f"model not improved. Early stopping patience : {epochs_no_improve}")
 
-        if epochs_no_improve >= args.early_stop_patience:
-            print("Early stopping")
-            break
+        # if epochs_no_improve >= args.early_stop_patience:
+        #     print("Early stopping")
+        #     break
 
     writer.close()
     torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')

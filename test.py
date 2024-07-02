@@ -71,42 +71,26 @@ def mask2string(dir):
     return r
 
 def main(args):
-    # model_config = SegformerConfig.from_pretrained(args.pretrained_model_name,
-    #                                                id2label=args.id2label, 
-    #                                                label2id=args.label2id,
-    #                                                num_labels=len(args.classes),
-    #                                                image_size=args.img_size,
-    #                                                num_encoder_blocks=args.num_encoder_blocks,
-    #                                                drop_path_rate=args.drop_path_rate,
-    #                                                hidden_dropout_prob=args.hidden_dropout_prob,
-    #                                                classifier_dropout_prob=args.classifier_dropout_prob,
-    #                                                attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-    #                                                semantic_loss_ignore_index=args.semantic_loss_ignore_index)
+    model_config = SegformerConfig.from_pretrained(args.pretrained_model_name,
+                                                   id2label=args.id2label, 
+                                                   label2id=args.label2id,
+                                                   num_labels=len(args.classes),
+                                                   image_size=args.img_size,
+                                                   num_encoder_blocks=args.num_encoder_blocks,
+                                                   drop_path_rate=args.drop_path_rate,
+                                                   hidden_dropout_prob=args.hidden_dropout_prob,
+                                                   classifier_dropout_prob=args.classifier_dropout_prob,
+                                                   attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+                                                   semantic_loss_ignore_index=args.semantic_loss_ignore_index)
 
-    # model_config.save_pretrained(f'{args.save_dir}')
-    # feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
-    # model = SegformerForSemanticSegmentation.from_pretrained(f"{args.save_dir}/weights/best.pt",
-    #                                                          config=model_config,
-    #                                                          ignore_mismatched_sizes=True)
-    
-    model_config = SegformerConfig(
-        id2label=args.id2label, 
-        label2id=args.label2id,
-        num_labels=len(args.classes),
-        image_size=args.img_size,
-        num_encoder_blocks=args.num_encoder_blocks,
-        drop_path_rate=args.drop_path_rate,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        classifier_dropout_prob=args.classifier_dropout_prob,
-        attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-        semantic_loss_ignore_index=args.semantic_loss_ignore_index
-    )
     model_config.save_pretrained(f'{args.save_dir}')
-    feature_extractor = SegformerImageProcessor(do_reduce_labels=args.do_reduce_labels)
-    model = SegformerForSemanticSegmentation(config=model_config)
+    feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
+    model = SegformerForSemanticSegmentation.from_pretrained(f"{args.save_dir}/weights/best.pt",
+                                                             config=model_config,
+                                                             ignore_mismatched_sizes=True)
     model.to(args.device)
     
-    files = sorted(glob(f"{args.data_dir}/test/*.jpeg"))
+    files = sorted(glob(f"{args.data_dir}/test/test/*.jpeg"))
     model.eval()
     with torch.no_grad():
         for file in tqdm(files, desc="Test"):
@@ -141,7 +125,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_01_23_21_13"
+    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_02_22_35_19"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir

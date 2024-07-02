@@ -21,7 +21,7 @@ class BKAIDataset(Dataset):
         
         self.data_dir = args.data_dir
         self.image_dir = f"{self.data_dir}/train/train"
-        self.mask_dir = f"{self.data_dir}/train_gt/train_gt"
+        self.mask_dir = f"{self.data_dir}/train_mask"
         self.bbox_dir = f"{self.data_dir}/train_boxes"
         self.transform = basic_transform(is_train=self.is_train, img_size=args.img_size)
 

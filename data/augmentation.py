@@ -22,20 +22,20 @@ def basic_transform(is_train, img_size):
             A.OneOf([
                 A.HorizontalFlip(p=0.25),
                 A.VerticalFlip(p=0.25),
-                A.ElasticTransform(p=0.25, border_mode=0),
+                # A.ElasticTransform(p=0.25, border_mode=0),
                 A.ShiftScaleRotate(p=0.25, border_mode=0, shift_limit=0.15, scale_limit=0.15, rotate_limit=0),
             ], p=1),
             
-            A.OneOf([
-                A.Blur(), 
-                A.GaussianBlur(), 
-                A.GlassBlur(), 
-                A.MotionBlur(), 
-                A.GaussNoise(), 
-                A.Sharpen(), 
-                A.MedianBlur(), 
-                A.MultiplicativeNoise()
-            ], p=1),
+            # A.OneOf([
+            #     A.Blur(), 
+            #     A.GaussianBlur(), 
+            #     A.GlassBlur(), 
+            #     A.MotionBlur(), 
+            #     A.GaussNoise(), 
+            #     A.Sharpen(), 
+            #     A.MedianBlur(), 
+            #     A.MultiplicativeNoise()
+            # ], p=1),
 
             A.RandomBrightnessContrast(p=0.5),
             A.RandomGamma (gamma_limit=(70, 130), eps=None, always_apply=False, p=0.2),
