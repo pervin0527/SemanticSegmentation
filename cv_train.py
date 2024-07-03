@@ -1,10 +1,13 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import torch
+import random
+import numpy as np
 
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 
+from torch.backends import cudnn
 from torch.nn import functional as F
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader, Subset
@@ -15,6 +18,17 @@ from data.voc import VOCDataset
 from data.bkai import BKAIDataset
 from loss import FocalLoss, compute_mean_iou, compute_mean_dice_coefficient_score
 from utils.utils import Args, inference_callback, plot_metrics, WarmupThenDecayScheduler
+
+
+def set_seed(seed_num):
+    random.seed(seed_num)
+    np.random.seed(seed_num)
+    
+    torch.manual_seed(seed_num)
+    torch.cuda.manual_seed(seed_num)
+    torch.cuda.manual_seed_all(seed_num)
+    cudnn.benchmark = False
+    cudnn.deterministic = True
 
 
 def train(model, dataloader, optimizer, criterion, device, ignore_idx=0):
@@ -91,24 +105,23 @@ def main(args):
                                                    semantic_loss_ignore_index=args.semantic_loss_ignore_index)
     model_config.save_pretrained(f'{args.save_dir}')
     feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
-    full_dataset = BKAIDataset(args, feature_extractor, image_set="train")
     
     kfold = KFold(n_splits=args.num_folds, shuffle=True, random_state=args.seed)
-    for fold, (train_idx, val_idx) in enumerate(kfold.split(full_dataset)):
-        print(f"Fold {fold+1}")
+    for fold in range(1, args.num_folds+1):
+        print(f"Fold {fold}")
 
-        fold_save_dir = os.path.join(args.save_dir, f'fold_{fold+1}')
+        fold_save_dir = os.path.join(args.save_dir, f'fold_{fold}')
         os.makedirs(f"{fold_save_dir}/images")
         os.makedirs(f"{fold_save_dir}/weights")
         os.makedirs(f"{fold_save_dir}/logs")
         os.makedirs(f"{fold_save_dir}/test")
         writer = SummaryWriter(log_dir=f"{fold_save_dir}/logs")
 
-        train_subset = Subset(full_dataset, train_idx)
-        val_subset = Subset(full_dataset, val_idx)
+        train_dataset = BKAIDataset(args, feature_extractor, image_set=f"train{fold}")
+        valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
         
-        train_dataloader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-        valid_dataloader = DataLoader(val_subset, batch_size=args.batch_size, num_workers=args.num_workers)
+        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+        valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
         model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name,
                                                              config=model_config,
@@ -123,23 +136,23 @@ def main(args):
         for epoch in range(args.epochs):
             current_lr = optimizer.param_groups[0]['lr']
             print(f"\nEpoch : [{epoch+1:>03}|{args.epochs}], LR : {current_lr}")
-            writer.add_scalar(f'Fold_{fold+1}/Learning Rate', optimizer.param_groups[0]['lr'], epoch)
+            writer.add_scalar(f'Fold_{fold}/Learning Rate', optimizer.param_groups[0]['lr'], epoch)
 
             train_loss, train_acc = train(model, train_dataloader, optimizer, criterion, args.device, args.semantic_loss_ignore_index)
-            writer.add_scalar(f'Fold_{fold+1}/Training/Loss', train_loss, epoch)
-            writer.add_scalar(f'Fold_{fold+1}/Training/Accuracy', train_acc, epoch)
+            writer.add_scalar(f'Fold_{fold}/Training/Loss', train_loss, epoch)
+            writer.add_scalar(f'Fold_{fold}/Training/Accuracy', train_acc, epoch)
             print(f"Train Loss : {train_loss:.4f}, Train Acc : {train_acc:.4f}")
 
             valid_loss, valid_acc = valid(model, valid_dataloader, criterion, args.device, args.semantic_loss_ignore_index)
-            writer.add_scalar(f'Fold_{fold+1}/Validation/Loss', valid_loss, epoch)
-            writer.add_scalar(f'Fold_{fold+1}/Validation/Accuracy', valid_acc, epoch)
+            writer.add_scalar(f'Fold_{fold}/Validation/Loss', valid_loss, epoch)
+            writer.add_scalar(f'Fold_{fold}/Validation/Accuracy', valid_acc, epoch)
             print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}")
             scheduler.step()
 
             inference_callback(args.sample_img, model, feature_extractor, args, epoch, fold_save_dir)
             if (epoch + 1) % args.metric_step == 0:
                 metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
-                writer.add_scalar(f'Fold_{fold+1}/Validation/metric score', metric_score, epoch)
+                writer.add_scalar(f'Fold_{fold}/Validation/metric score', metric_score, epoch)
                 print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
 
                 if metric_score > best_metric_score:
@@ -149,6 +162,7 @@ def main(args):
                     epochs_no_improve = 0
                 else:
                     epochs_no_improve += 1
+                    print(f"metric score not improved. [{epochs_no_improve}/{args.early_stop_patience}]")
 
             if epochs_no_improve >= args.early_stop_patience:
                 print("Early stopping")
@@ -159,9 +173,9 @@ def main(args):
 
 if __name__ == "__main__":
     args = Args("./config.yaml", is_train=True, is_cv=True)
+    set_seed(args.seed)
     args.num_workers = os.cpu_count()
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    args.seed = 42  # Seed for reproducibility
 
     args.classes = BKAIDataset.CLASSES
     args.colormap = BKAIDataset.COLORMAP

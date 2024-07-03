@@ -1,3 +1,5 @@
+## kaggle competitions submit -c bkai-igh-neopolyp -f ./runs/2024_07_03_07_59_42/output.csv -m "GG"
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import cv2
@@ -124,7 +126,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "./runs/2024_04_02_23_03_28"
+    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_03_07_59_42"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir

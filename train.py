@@ -1,10 +1,13 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import torch
+import random
+import numpy as np
 
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 
+from torch.backends import cudnn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -14,6 +17,16 @@ from data.voc import VOCDataset
 from data.bkai import BKAIDataset
 from loss import FocalLoss, compute_mean_iou, compute_mean_dice_coefficient_score
 from utils.utils import Args, inference_callback, plot_metrics, WarmupThenDecayScheduler
+
+def set_seed(seed_num):
+    random.seed(seed_num)
+    np.random.seed(seed_num)
+    
+    torch.manual_seed(seed_num)
+    torch.cuda.manual_seed(seed_num)
+    torch.cuda.manual_seed_all(seed_num)
+    cudnn.benchmark = False
+    cudnn.deterministic = True
 
 
 def valid(model, dataloader, criterion, device, ignore_idx=0):
@@ -95,8 +108,6 @@ def main(args):
                                                              ignore_mismatched_sizes=True)
     model.to(args.device)
 
-    # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
-    # valid_dataset = VOCDataset(args, feature_extractor, image_set="test", year=2007)
     train_dataset = BKAIDataset(args, feature_extractor, image_set="train")
     valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
 
@@ -104,11 +115,8 @@ def main(args):
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
-
+    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean').to(args.device)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
-    # scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
     best_metric_score = 0.0
     for epoch in range(args.epochs):
@@ -127,13 +135,10 @@ def main(args):
         print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}")
         scheduler.step()
 
-        inference_callback(args.sample_img, model, feature_extractor, args, epoch)
+        inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=args.save_dir)
         if (epoch + 1) % args.metric_step == 0:
-            # metrics_dict = compute_mean_iou(model, valid_dataloader, args.device, len(args.classes), ignore_index=255)
-            # metric_score = metrics_dict["mean_iou"]
 
             metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
-
             writer.add_scalar('Validation/metric score', metric_score, epoch)
             print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
 
@@ -142,14 +147,13 @@ def main(args):
                 torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
                 print(f"best metric improved, model saved.")
 
-            # plot_metrics(metrics_dict, args.classes, "accuracy", f"{args.save_dir}/logs/accuracy_per_class_{epoch:>03}.png")
-            # plot_metrics(metrics_dict, args.classes, "iou", f"{args.save_dir}/logs/iou_per_class_{epoch:>03}.png")
-
     writer.close()
     torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')
 
+
 if __name__ == "__main__":
     args = Args("./config.yaml", is_train=True)
+    set_seed(args.seed)
     args.num_workers = os.cpu_count()
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

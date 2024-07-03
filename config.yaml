@@ -1,26 +1,28 @@
-data_dir: "/home/pervinco/Datasets/BKAI_IGH_NeoPolyp"
-sample_img: "/home/pervinco/Datasets/BKAI_IGH_NeoPolyp/test/4e2a6e51d077bad31c8c5f54ffaa27a6.jpeg"
+data_dir: "/home/pervinco/Datasets/BKAI-IGH-NeoPolyp"
+sample_img: "/home/pervinco/Datasets/BKAI-IGH-NeoPolyp/test/test/4e2a6e51d077bad31c8c5f54ffaa27a6.jpeg"
 
 save_dir: "./runs"
 pretrained_model_name: "nvidia/mit-b5" ## "nvidia/mit-b0" "nvidia/segformer-b0-finetuned-ade-512-512"
 
-num_folds: 5
+num_folds: 3
 num_workers: 32
-epochs: 1000
-img_size: 960
-batch_size: 4
-metric_step: 5
+seed: 1994
 
+epochs: 1000
+img_size: 512
+batch_size: 4
+metric_step: 1
 learning_rate: 0.0001
-weight_decay: 0.000001
-warmup_epochs: 200
+weight_decay: 0.001
 early_stop_patience: 10
 
-focal_alpha: null
-spatial_alpha: 0.3
+warmup_epochs: 200
+
+focal_alpha: [1, 1, 1]
+focal_gamma: 2
+spatial_alpha: 0.2
 mixup_alpha: 0.6
 
-lr_patience: 40
 min_lr: 0.000001
 max_lr: 0.001
 T_0: 200
@@ -41,8 +43,8 @@ initializer_range: 0.02
 
 do_reduce_labels: False
 semantic_loss_ignore_index: 255
-hidden_dropout_prob: 0.5 ## 0.0
-attention_probs_dropout_prob: 0.3 ## 0.0
-classifier_dropout_prob: 0.4 ## 0.1
-drop_path_rate: 0.4 ## 0.1
+hidden_dropout_prob: 0.3 ## 0.0
+attention_probs_dropout_prob: 0.1 ## 0.0
+classifier_dropout_prob: 0.2 ## 0.1
+drop_path_rate: 0.2 ## 0.1
 decoder_hidden_size: 768 ## 256

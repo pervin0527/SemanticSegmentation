@@ -1,3 +1,5 @@
+## kaggle competitions submit -c bkai-igh-neopolyp -f /home/pervinco/SemanticSegmentation/runs/2024_07_03_17_10_35/output.csv -m "GG"
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import cv2
@@ -98,7 +100,7 @@ def main(args):
         model.eval()
         models.append(model)
 
-    files = sorted(glob(f"{args.data_dir}/test/*.jpeg"))
+    files = sorted(glob(f"{args.data_dir}/test/test/*.jpeg"))
     with torch.no_grad():
         for file in tqdm(files, desc="Test"):
             file_name = file.split('/')[-1]
@@ -142,7 +144,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "./runs/2024_06_29_21_39_26"
+    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_03_17_10_35"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir
