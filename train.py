@@ -135,17 +135,16 @@ def main(args):
         print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}")
         scheduler.step()
 
+        metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
+        writer.add_scalar('Validation/metric score', metric_score, epoch)
+        print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
+
+        if metric_score > best_metric_score:
+            best_metric_score = metric_score
+            torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
+            print(f"best metric improved, model saved.")
+
         inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=args.save_dir)
-        if (epoch + 1) % args.metric_step == 0:
-
-            metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
-            writer.add_scalar('Validation/metric score', metric_score, epoch)
-            print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
-
-            if metric_score > best_metric_score:
-                best_metric_score = metric_score
-                torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
-                print(f"best metric improved, model saved.")
 
     writer.close()
     torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')
