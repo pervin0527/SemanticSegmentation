@@ -14,7 +14,7 @@ class BKAIDataset(Dataset):
     CLASSES = ["background", "non-neoplastic polyps", "neoplastic polyps"]
     COLORMAP = [[0, 0, 0], [0, 255, 0], [255, 0, 0]]
 
-    def __init__(self, args, feature_extractor=None, image_set="train"):
+    def __init__(self, args, feature_extractor=None, image_set="train", train_idx=1):
         self.args = args
         self.feature_extractor = feature_extractor
         self.is_train = True if "train" in image_set else False
@@ -41,6 +41,7 @@ class BKAIDataset(Dataset):
 
     def __len__(self):
         return len(self.total_files)
+
 
     def get_img_mask(self, file_name):
         file_name = file_name.split('.')[0]

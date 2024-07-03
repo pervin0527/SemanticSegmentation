@@ -84,6 +84,7 @@ def main(args):
                                                    classifier_dropout_prob=args.classifier_dropout_prob,
                                                    attention_probs_dropout_prob=args.attention_probs_dropout_prob,
                                                    semantic_loss_ignore_index=args.semantic_loss_ignore_index)
+
     model_config.save_pretrained(f'{args.save_dir}')
     feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
     model = SegformerForSemanticSegmentation.from_pretrained(f"{args.save_dir}/weights/best.pt",
