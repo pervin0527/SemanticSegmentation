@@ -17,25 +17,25 @@ class BKAIDataset(Dataset):
     def __init__(self, args, feature_extractor=None, image_set="train", train_idx=1):
         self.args = args
         self.feature_extractor = feature_extractor
-        self.is_train = True if image_set == "train" else False
+        self.is_train = True if "train" in image_set else False
         
         self.data_dir = args.data_dir
         self.image_dir = f"{self.data_dir}/train/train"
-        self.mask_dir = f"{self.data_dir}/train_mask"
+        self.mask_dir = f"{self.data_dir}/train_gt/train_gt"
         self.bbox_dir = f"{self.data_dir}/train_boxes"
         self.transform = basic_transform(is_train=self.is_train, img_size=args.img_size)
 
-        with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
-            self.total_files = [line.strip() for line in f.readlines()]
+        # with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
+        #     self.total_files = [line.strip() for line in f.readlines()]
 
-        # if image_set == "train":        
-        #     total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}{train_idx}.csv")
-        #     self.total_files = total_df['file_name'].to_list()
-        #     random.shuffle(self.total_files)
-        # else:
-        #     total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
-        #     self.total_files = total_df['file_name'].to_list()
-        #     random.shuffle(self.total_files)
+        if image_set == "train":        
+            total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
+            self.total_files = total_df['file_name'].to_list()
+            random.shuffle(self.total_files)
+        else:
+            total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
+            self.total_files = total_df['file_name'].to_list()
+            random.shuffle(self.total_files)
         
         self.bg_files = glob(f"{self.data_dir}/backgrounds/train/0_normal/*.jpg")
 

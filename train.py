@@ -28,6 +28,16 @@ def set_seed(seed_num):
     cudnn.benchmark = False
     cudnn.deterministic = True
 
+def set_seed(seed_num):
+    random.seed(seed_num)
+    np.random.seed(seed_num)
+    
+    torch.manual_seed(seed_num)
+    torch.cuda.manual_seed(seed_num)
+    torch.cuda.manual_seed_all(seed_num)
+    cudnn.benchmark = False
+    cudnn.deterministic = True
+
 
 def valid(model, dataloader, criterion, device, num_classes, ignore_idx=0):
     model.eval()
@@ -112,8 +122,6 @@ def main(args):
                                                              ignore_mismatched_sizes=True)
     model.to(args.device)
 
-    # train_dataset = VOCDataset(args, feature_extractor, image_set="trainval", year=2012)
-    # valid_dataset = VOCDataset(args, feature_extractor, image_set="test", year=2007)
     train_dataset = BKAIDataset(args, feature_extractor, image_set="train")
     valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
 
@@ -121,11 +129,8 @@ def main(args):
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=2, reduction='mean').to(args.device)
-
+    criterion = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean').to(args.device)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
-    # scheduler = WarmupThenDecayScheduler(optimizer, warmup_epochs=args.warmup_epochs, total_epochs=args.epochs, min_lr=args.min_lr, max_lr=args.max_lr)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dataloader) * args.epochs, eta_min=args.learning_rate / 100)
 
     epochs_no_improve = 0
     max_dice_coefficient = 0.0
@@ -143,28 +148,26 @@ def main(args):
         writer.add_scalar('Validation/Loss', valid_loss, epoch)
         writer.add_scalar('Validation/Dice', valid_dice, epoch)
         print(f"Valid Loss : {valid_loss:.4f}, Valid Dice : {valid_dice:.4f}")
-        inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=f"{args.save_dir}")
 
-        # scheduler.step()
-        scheduler.step()
-        if valid_dice > max_dice_coefficient:
-            max_dice_coefficient = valid_dice
-            torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
-            print(f"{max_dice_coefficient:.4f} model improved, weight saved.")
-        #     epochs_no_improve = 0
-        # else:
-        #     epochs_no_improve += 1
-        #     print(f"model not improved. Early stopping patience : {epochs_no_improve}")
+        inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=args.save_dir)
+        if (epoch + 1) % args.metric_step == 0:
 
-        # if epochs_no_improve >= args.early_stop_patience:
-        #     print("Early stopping")
-        #     break
+            metric_score = compute_mean_dice_coefficient_score(model, valid_dataloader, args.device, len(args.classes))
+            writer.add_scalar('Validation/metric score', metric_score, epoch)
+            print(f"Epoch [{epoch+1}/{args.epochs}] - metric score: {metric_score:.4f}")
+
+            if metric_score > best_metric_score:
+                best_metric_score = metric_score
+                torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
+                print(f"best metric improved, model saved.")
 
     writer.close()
     torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')
 
+
 if __name__ == "__main__":
     args = Args("./config.yaml", is_train=True)
+    set_seed(args.seed)
     args.num_workers = os.cpu_count()
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     set_seed(args.seed)
