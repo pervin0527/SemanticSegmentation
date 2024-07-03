@@ -10,10 +10,10 @@ num_workers: 32
 seed: 1994
 
 epochs: 500
-img_size: 960
+img_size: 512
 batch_size: 32
 learning_rate: 0.00001
-weight_decay: 0.000001
+weight_decay: 0.001
 
 warmup_epochs: 200
 early_stop_patience: 20
