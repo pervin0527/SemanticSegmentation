@@ -25,18 +25,18 @@ class BKAIDataset(Dataset):
         self.bbox_dir = f"{self.data_dir}/train_boxes"
         self.transform = basic_transform(is_train=self.is_train, img_size=args.img_size)
 
-        self.total_files = os.listdir(self.image_dir)
+        # self.total_files = os.listdir(self.image_dir)
         # with open(f"{self.data_dir}/files/{image_set}.txt", 'r') as f:
         #     self.total_files = [line.strip() for line in f.readlines()]
 
-        # if image_set == "train":        
-        #     total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
-        #     self.total_files = total_df['file_name'].to_list()
-        #     random.shuffle(self.total_files)
-        # else:
-        #     total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
-        #     self.total_files = total_df['file_name'].to_list()
-        #     random.shuffle(self.total_files)
+        if image_set == "train":        
+            total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
+            self.total_files = total_df['file_name'].to_list()
+            random.shuffle(self.total_files)
+        else:
+            total_df = pd.read_csv(f"{args.data_dir}/files/{image_set}.csv")
+            self.total_files = total_df['file_name'].to_list()
+            random.shuffle(self.total_files)
         
         self.bg_files = glob(f"{self.data_dir}/backgrounds/train/0_normal/*.jpg")
 

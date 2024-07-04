@@ -13,7 +13,7 @@ def basic_transform(is_train, img_size):
             A.OneOf([
                 A.Resize(img_size, img_size, p=0.25),
                 A.RandomSizedBBoxSafeCrop(img_size, img_size, p=0.25),
-                A.ShiftScaleRotate(p=0.25, border_mode=0, shift_limit=0.15, scale_limit=0.15, rotate_limit=90),
+                A.ShiftScaleRotate(p=0.25, border_mode=0, shift_limit=0.1, scale_limit=0.1, rotate_limit=90),
                 A.Compose([
                     A.RandomSizedBBoxSafeCrop(height=img_size//2, width=img_size//2, p=1),
                     A.PadIfNeeded(min_height=img_size, min_width=img_size, border_mode=0, p=1)], 
