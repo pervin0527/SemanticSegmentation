@@ -6,10 +6,14 @@ pretrained_model_name: nvidia/mit-b5 ## nvidia/mit-b0 nvidia/segformer-b0-finetu
 
 ## Training Hyps
 num_folds: 3 ## only for cross validations
+train_set_idx: 3
+resume_weights: /home/pervinco/SemanticSegmentation/runs/2024_07_05_08_17_20/weights/best.pt
+
+
 seed: 1994
 epochs: 500
 img_size: 512
-batch_size: 4
+batch_size: 6
 num_workers: 32
 learning_rate: 0.00001
 weight_decay: 0.001

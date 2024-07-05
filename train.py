@@ -128,9 +128,13 @@ def main(args):
     model = SegformerForSemanticSegmentation.from_pretrained(args.pretrained_model_name,
                                                              config=model_config,
                                                              ignore_mismatched_sizes=True)
+    
+    if args.resume_weights:
+        print(f"Loading weights from {args.resume_weights}")
+        model.load_state_dict(torch.load(args.resume_weights, map_location=args.device))
     model.to(args.device)
 
-    train_dataset = BKAIDataset(args, feature_extractor, image_set="train1")
+    train_dataset = BKAIDataset(args, feature_extractor, image_set=f"train{args.train_set_idx}")
     valid_dataset = BKAIDataset(args, feature_extractor, image_set="valid")
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
@@ -163,7 +167,7 @@ def main(args):
 
         scheduler.step()
         if valid_loss < minimum_loss:
-            print(f"Valid Loss improved {minimum_loss} --> {valid_loss}, model saved.")
+            print(f"Valid Loss improved {minimum_loss:.4f} --> {valid_loss:.4f}, model saved.")
             minimum_loss = valid_loss
             torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
 

@@ -11,8 +11,8 @@ from data.util import mask_encoding
 from data.augmentation import basic_transform, apply_transform, sep, mosaic, mixup, get_bg_image
 
 class BKAIDataset(Dataset):
-    CLASSES = ["background", "non-neoplastic polyps", "neoplastic polyps"]
-    COLORMAP = [[0, 0, 0], [0, 255, 0], [255, 0, 0]]
+    CLASSES = ["background", "neoplastic polyps", "non-neoplastic polyps"]
+    COLORMAP = [[0, 0, 0], [255, 0, 0], [0, 255, 0]]
 
     def __init__(self, args, feature_extractor=None, image_set="train"):
         self.args = args
