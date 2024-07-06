@@ -127,7 +127,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_05_08_17_20"
+    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_06_01_58_40"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir

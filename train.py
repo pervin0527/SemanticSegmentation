@@ -144,6 +144,7 @@ def main(args):
     criterion1 = FocalLoss(num_class=len(args.classes), alpha=args.focal_alpha, gamma=args.focal_gamma, reduction='mean')
     criterion2 = DiceLoss(num_classes=len(args.classes))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=args.T_0, T_mult=args.T_mult, eta_min=args.min_lr)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=args.lr_patience, factor=args.lr_factor, verbose=True)
 
     minimum_loss = float("inf")
     for epoch in range(args.epochs):
@@ -165,12 +166,13 @@ def main(args):
         writer.add_scalar('Validation/Mean Dice Coefficient', valid_dice, epoch)
         print(f"Valid Loss : {valid_loss:.4f}, Valid Acc : {valid_acc:.4f}, Valid F1 : {valid_f1:.4f}, Valid Dice : {valid_dice:.4f}")
 
-        scheduler.step()
         if valid_loss < minimum_loss:
             print(f"Valid Loss improved {minimum_loss:.4f} --> {valid_loss:.4f}, model saved.")
             minimum_loss = valid_loss
             torch.save(model.state_dict(), f'{args.save_dir}/weights/best.pt')
 
+        scheduler.step()
+        # scheduler.step(valid_loss)
         inference_callback(args.sample_img, model, feature_extractor, args, epoch, save_dir=args.save_dir)
         torch.save(model.state_dict(), f'{args.save_dir}/weights/last.pt')
 
