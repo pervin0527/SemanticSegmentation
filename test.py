@@ -87,7 +87,7 @@ def main(args):
 
     model_config.save_pretrained(f'{args.save_dir}')
     feature_extractor = SegformerImageProcessor.from_pretrained(args.pretrained_model_name, do_reduce_labels=args.do_reduce_labels)
-    model = SegformerForSemanticSegmentation.from_pretrained(f"{args.save_dir}/weights/best.pt",
+    model = SegformerForSemanticSegmentation.from_pretrained(f"{args.save_dir}/weights/last.pt",
                                                              config=model_config,
                                                              ignore_mismatched_sizes=True)
     model.to(args.device)
@@ -127,7 +127,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_06_01_58_40"
+    saved_dir = "/home/pervinco/SemanticSegmentation/runs/2024_07_06_19_17_33"
 
     args = Args(f"{saved_dir}/config.yaml", is_train=False)
     args.save_dir = saved_dir
